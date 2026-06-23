@@ -1,0 +1,46 @@
+apiVersion: app.containerservice.azure.com/v1beta1
+kind: ContainerApp
+metadata:
+  name: slomsapi
+identity:
+  type: SystemAssigned
+properties:
+  environmentId: /subscriptions/295f53a3-9253-4547-8062-51d425160903/resourceGroups/sloms/providers/Microsoft.App/managedEnvironments/slomsapi-env
+  workloadProfileName: Consumption
+configuration:
+  ingress:
+    external: true
+    targetPort: 3000
+    traffic:
+      - weight: 100
+        revisionName: slomsapi-rev-00001
+        label: production
+template:
+  containers:
+    - name: slomsapi
+      image: slomsacregistry2026.azurecr.io/slomsapi:latest
+      env:
+        - name: DB_HOST
+          value: "sloms.database.windows.net"
+        - name: DB_PORT
+          value: "1433"
+        - name: DB_USERNAME
+          value: "slomsadmin"
+        - name: DB_PASSWORD
+          value: "Sl0ms@dm1n2026!"
+        - name: DB_DATABASE
+          value: "slomsdb"
+        - name: DB_ENCRYPT
+          value: true
+        - name: DB_TRUST_SERVER_CERTIFICATE
+          value: true
+      resources:
+        cpu: 100m
+        memoryGiB: 0.5
+scale:
+  minReplicas: 1
+  maxReplicas: 3
+rules:
+  - type: http
+    metadata:
+      concurrentRequests: "50"

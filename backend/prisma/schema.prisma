@@ -1,0 +1,274 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  userId           Int       @id @default(autoincrement()) @map("UserID")
+  username         String    @unique @db.VarChar(100) @map("Username")
+  passwordHash     String    @db.VarChar(255) @map("PasswordHash")
+  fullName         String?   @db.VarChar(200) @map("FullName")
+  email            String?   @db.VarChar(255) @map("Email")
+  role             String    @default("ReadOnly") @db.VarChar(50) @map("Role")
+  isActive           Boolean   @default(true) @map("IsActive")
+  lastLoginAt        DateTime? @map("LastLoginAt")
+  failedLoginCount   Int       @default(0) @map("FailedLoginCount")
+  lockedUntil        DateTime? @map("LockedUntil")
+  createdAt          DateTime? @default(now()) @map("CreatedAt")
+  createdBy          String?   @db.VarChar(100) @map("CreatedBy")
+  linkedCustomerId   Int?      @map("LinkedCustomerID")
+  mustChangePassword Boolean   @default(false) @map("MustChangePassword")
+  linkedCustomer     Customer? @relation(fields: [linkedCustomerId], references: [customerId])
+  userSettings       UserSetting[]
+
+  @@index([linkedCustomerId])
+  @@map("Users")
+}
+
+model Customer {
+  customerId      Int               @id @default(autoincrement()) @map("CustomerID")
+  accountNumber   String?           @db.VarChar(20) @map("AccountNumber")
+  centreNumber    String?           @db.VarChar(50) @map("CentreNumber")
+  companyName     String?           @db.VarChar(200) @map("CompanyName")
+  invBuildingName String?           @db.VarChar(100) @map("InvBuildingName")
+  invAddressLn1   String?           @db.VarChar(100) @map("InvAddressLn1")
+  invAddressLn2   String?           @db.VarChar(100) @map("InvAddressLn2")
+  invTownOrCity   String?           @db.VarChar(100) @map("InvTownOrCity")
+  invCounty       String?           @db.VarChar(100) @map("InvCounty")
+  invPostCode     String?           @db.VarChar(10) @map("InvPostCode")
+  contactName     String?           @db.VarChar(50) @map("ContactName")
+  contactEmail    String?           @db.VarChar(50) @map("ContactEmail")
+  reportEmail     String?           @db.VarChar(255) @map("ReportEmail")
+  contactPhone    String?           @db.VarChar(50) @map("ContactPhone")
+  contactMobile   String?           @db.VarChar(50) @map("ContactMobille")
+  contactFax      String?           @db.VarChar(50) @map("ContactFax")
+  band            String?           @db.VarChar(20) @map("Band")
+  createdOn       DateTime?         @default(now()) @map("CreatedOn")
+  suspended       Boolean           @default(false) @map("Suspended")
+  suspendedOn     DateTime?         @map("SuspendedOn")
+  addresses       CustomerAddress[]
+  orders          Order[]
+  linkedUsers     User[]
+
+  @@map("Customers")
+}
+
+model CustomerAddress {
+  addressId         Int       @id @default(autoincrement()) @map("AddressID")
+  customerAccount   Int?      @map("CustomerAccount")
+  siteCompanyName   String?   @db.VarChar(200) @map("SiteCompanyName")
+  delBuildingName   String?   @db.VarChar(100) @map("DelBuildingName")
+  delAddressLn1     String?   @db.VarChar(100) @map("DelAddressLn1")
+  delAddressLn2     String?   @db.VarChar(100) @map("DelAddressLn2")
+  delTownOrCity     String?   @db.VarChar(100) @map("DelTownOrCity")
+  delCounty         String?   @db.VarChar(100) @map("DelCounty")
+  delPostCode       String?   @db.VarChar(10) @map("DelPostCode")
+  siteContactName   String?   @db.VarChar(50) @map("SiteContactName")
+  siteContactEmail  String?   @db.VarChar(50) @map("SiteContactEmail")
+  siteContactPhone  String?   @db.VarChar(50) @map("SiteContactPhone")
+  siteContactMobile String?   @db.VarChar(50) @map("SiteContactMobille")
+  siteContactFax    String?   @db.VarChar(50) @map("SiteContactFax")
+  defaultAddress    Boolean   @default(false) @map("DefaultAddress")
+  void              Boolean   @default(false) @map("Void")
+  createdOn         DateTime? @default(now()) @map("CreatedOn")
+  customer          Customer? @relation(fields: [customerAccount], references: [customerId])
+  orders            Order[]
+
+  @@index([customerAccount])
+  @@map("CustomerAddress")
+}
+
+model VatRate {
+  vatRateId Int       @id @default(autoincrement()) @map("VatRateID")
+  rate      Decimal   @db.Decimal(5, 2) @map("Rate")
+  label     String    @db.VarChar(50) @map("Label")
+  validFrom DateTime  @db.Date @map("ValidFrom")
+  validTo   DateTime? @db.Date @map("ValidTo")
+  orders    Order[]
+
+  @@map("VatRates")
+}
+
+model Order {
+  orderNumber           Int              @map("OrderNumber")
+  orderBatch            Int              @default(1) @map("OrderBatch")
+  customerAccount       Int?             @map("CustomerAccount")
+  customerRef           String?          @db.VarChar(50) @map("CustomerRef")
+  orderContact          String?          @db.VarChar(100) @map("OrderContact")
+  deliveryAddress       Int?             @map("DeliveryAddress")
+  receivedOn            DateTime?        @map("ReceivedOn")
+  dispatchedOn          DateTime?        @map("DispatchedOn")
+  vatRateId             Int?             @map("VatRateID")
+  priceBand             String?          @db.VarChar(20) @map("PriceBand")
+  createdOn             DateTime?        @default(now()) @map("CreatedOn")
+  dispatchDateStamp     DateTime?        @map("DispatchDateStamp")
+  void                  Boolean          @default(false) @map("Void")
+  voidDateStamp         DateTime?        @map("VoidDateStamp")
+  voidedBy              String?          @db.VarChar(100) @map("VoidedBy")
+  createdBy             String?          @db.VarChar(100) @map("CreatedBy")
+  status                String           @default("Received") @db.VarChar(20) @map("Status")
+  statusChangedOn       DateTime?        @map("StatusChangedOn")
+  customer              Customer?        @relation(fields: [customerAccount], references: [customerId])
+  deliveryAddressDetail CustomerAddress? @relation(fields: [deliveryAddress], references: [addressId])
+  vatRate               VatRate?         @relation(fields: [vatRateId], references: [vatRateId])
+  items                 OrderedItem[]
+  statusHistory         OrderStatusHistory[]
+
+  @@id([orderNumber, orderBatch])
+  @@index([customerAccount])
+  @@index([deliveryAddress])
+  @@index([vatRateId])
+  @@index([createdBy])
+  @@map("Order")
+}
+
+model OrderStatusHistory {
+  id          Int      @id @default(autoincrement()) @map("Id")
+  orderNumber Int      @map("OrderNumber")
+  orderBatch  Int      @map("OrderBatch")
+  status      String   @db.VarChar(20) @map("Status")
+  changedOn   DateTime @default(now()) @db.Timestamptz @map("ChangedOn")
+  order       Order    @relation(fields: [orderNumber, orderBatch], references: [orderNumber, orderBatch])
+
+  @@index([orderNumber, orderBatch])
+  @@map("OrderStatusHistory")
+}
+
+model OrderedItem {
+  serialNumber      String    @id @db.VarChar(9) @map("SerialNumber")
+  patientInitial    String?   @db.VarChar(5) @map("PatientInitial")
+  patientSurname    String?   @db.VarChar(50) @map("PatientSurname")
+  modelCode         String?   @db.VarChar(50) @map("ModelCode")
+  createdOn         DateTime? @map("CreatedOn")
+  week              Int?      @default(0) @map("Week")
+  parentOrder       Int?      @map("ParentOrder")
+  parentBatch       Int?      @map("ParentBatch")
+  customerRef       String?   @db.VarChar(20) @map("CustomerRef")
+  side              String?   @db.VarChar(1) @map("Side")
+  description       String?   @db.VarChar(50) @map("Description")
+  category          String?   @db.VarChar(50) @map("Category")
+  price             Float?    @default(0) @map("Price")
+  vent              Float?    @default(0) @db.Real @map("Vent")
+  colour            String?   @db.VarChar(50) @map("Colour")
+  tubing            String?   @db.VarChar(50) @map("Tubing")
+  options           String?   @db.VarChar(50) @map("Options")
+  checkedOut            Boolean           @default(false) @map("CheckedOut")
+  checkoutDateStamp     DateTime?         @map("CheckoutDateStamp")
+  void                  Boolean           @default(false) @map("Void")
+  voidDateStamp         DateTime?         @map("VoidDateStamp")
+  voidedBy              String?           @db.VarChar(100) @map("VoidedBy")
+  createdBy             String?           @db.VarChar(100) @map("CreatedBy")
+  priceListRevisionId   Int?              @map("PriceListRevisionID")
+  priceListName         String?           @db.VarChar(255) @map("PriceListName")
+  order                 Order?            @relation(fields: [parentOrder, parentBatch], references: [orderNumber, orderBatch])
+  priceListRevision     PriceListRevision? @relation(fields: [priceListRevisionId], references: [id])
+
+  @@index([parentOrder, parentBatch])
+  @@index([createdBy])
+  @@map("OrderedItems")
+}
+
+model GlobalSetting {
+  key         String  @id @db.VarChar(255) @map("Key")
+  val         String? @map("Val")
+  description String? @map("Description")
+  exposed     Boolean @default(false) @map("Exposed")
+
+  @@map("GlobalSettings")
+}
+
+model UserSetting {
+  userId Int    @map("UserID")
+  key    String @db.VarChar(255) @map("Key")
+  val    String? @map("Val")
+  user   User   @relation(fields: [userId], references: [userId])
+
+  @@id([userId, key])
+  @@index([userId])
+  @@map("UserSettings")
+}
+
+model Sequence {
+  key     String @id @db.VarChar(50) @map("Key")
+  counter Int    @default(0) @map("Counter")
+
+  @@map("Sequences")
+}
+
+model UserAuditLog {
+  auditId   Int      @id @default(autoincrement()) @map("AuditID")
+  userId    Int?     @map("UserID")
+  username  String   @db.VarChar(100) @map("Username")
+  event     String   @db.VarChar(50) @map("Event")
+  detail    String?  @db.VarChar(500) @map("Detail")
+  ipAddress String?  @db.VarChar(45) @map("IPAddress")
+  createdAt DateTime @default(now()) @map("CreatedAt")
+
+  @@index([userId])
+  @@index([event])
+  @@index([createdAt])
+  @@map("UserAuditLog")
+}
+
+model PriceListItem {
+  itemId        String      @id @db.VarChar(255) @map("ItemID")
+  category      String?     @db.VarChar(255) @map("Category")
+  description   String?     @db.VarChar(255) @map("Description")
+  void          Boolean     @default(false) @map("Void")
+  voidDateStamp DateTime?   @map("VoidDateStamp")
+  voidedBy      String?     @db.VarChar(100) @map("VoidedBy")
+  createdAt     DateTime    @default(now()) @map("CreatedAt")
+  createdBy     String?     @db.VarChar(100) @map("CreatedBy")
+  prices        ItemPrice[]
+
+  @@map("PriceListItem")
+}
+
+model PriceListType {
+  id            Int         @id @default(autoincrement()) @map("ListID")
+  name          String      @unique @db.VarChar(255) @map("Name")
+  displayName   String?     @db.VarChar(255) @map("DisplayName")
+  sortOrder     Int         @default(0) @map("SortOrder")
+  isActive      Boolean     @default(true) @map("IsActive")
+  void          Boolean     @default(false) @map("Void")
+  voidDateStamp DateTime?   @map("VoidDateStamp")
+  voidedBy      String?     @db.VarChar(100) @map("VoidedBy")
+  createdAt     DateTime    @default(now()) @map("CreatedAt")
+  createdBy     String?     @db.VarChar(100) @map("CreatedBy")
+  prices        ItemPrice[]
+
+  @@map("PriceListType")
+}
+
+model PriceListRevision {
+  id          Int         @id @default(autoincrement()) @map("RevisionID")
+  name        String      @db.VarChar(255) @map("Name")
+  status      String      @default("draft") @db.VarChar(20) @map("Status")
+  importedAt  DateTime    @default(now()) @map("ImportedAt")
+  activatedAt DateTime?   @map("ActivatedAt")
+  notes       String?     @db.VarChar(1000) @map("Notes")
+  importedBy  String?       @db.VarChar(255) @map("ImportedBy")
+  prices      ItemPrice[]
+  orderedItems OrderedItem[]
+
+  @@index([status])
+  @@map("PriceListRevision")
+}
+
+model ItemPrice {
+  itemId      String              @map("ItemID")
+  listId      Int                 @map("ListID")
+  revisionId  Int                 @map("RevisionID")
+  price       Float?              @map("Price")
+
+  item        PriceListItem       @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+  list        PriceListType       @relation(fields: [listId], references: [id], onDelete: Cascade)
+  revision    PriceListRevision   @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, listId, revisionId])
+  @@index([revisionId])
+  @@map("ItemPrice")
+}
