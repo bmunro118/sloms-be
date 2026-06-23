@@ -13,7 +13,7 @@ import {
   HttpStatus,
   Request,
   UseGuards,
-} from "@nestjs/common";
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -22,18 +22,18 @@ import {
   ApiCreatedResponse,
   ApiQuery,
   ApiBody,
-} from "@nestjs/swagger";
-import { PagingDto } from "../common/paging";
-import { IsString, IsNotEmpty, MinLength, MaxLength } from "class-validator";
-import { UsersService, AuditEvent } from "./users.service";
-import { CreateUserDto } from "./dto/create-user.dto";
-import { UpdateUserDto } from "./dto/update-user.dto";
-import { ChangePasswordDto } from "./dto/change-password.dto";
-import { FindAuditLogQueryDto } from "./dto/find-audit-log-query.dto";
-import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { RolesGuard } from "../auth/guards/roles.guard";
-import { Roles } from "../auth/decorators/roles.decorator";
-import { Role } from "./entities/role.enum";
+} from '@nestjs/swagger';
+import { PagingDto } from '../common/paging';
+import { IsString, IsNotEmpty, MinLength, MaxLength } from 'class-validator';
+import { UsersService, AuditEvent } from './users.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { FindAuditLogQueryDto } from './dto/find-audit-log-query.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from './entities/role.enum';
 
 class ResetPasswordDto {
   @IsString()
@@ -43,9 +43,9 @@ class ResetPasswordDto {
   newPassword: string;
 }
 
-@ApiTags("users")
-@ApiBearerAuth("access-token")
-@Controller("users")
+@ApiTags('users')
+@ApiBearerAuth('access-token')
+@Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -58,10 +58,10 @@ export class UsersController {
    * GET /users/me
    * Returns the currently authenticated user's profile.
    */
-  @Get("me")
+  @Get('me')
   @Roles(Role.Admin, Role.Manager, Role.Operative, Role.ReadOnly, Role.Customer)
   @ApiOperation({
-    summary: "Get own profile",
+    summary: 'Get own profile',
     description:
       "Returns the currently authenticated user's profile (passwordHash excluded). Available to all authenticated users.",
   })
@@ -75,11 +75,11 @@ export class UsersController {
    * Allows the currently authenticated user to change their own password.
    * Requires the current password to be supplied for verification.
    */
-  @Patch("me/password")
+  @Patch('me/password')
   @HttpCode(HttpStatus.OK)
   @Roles(Role.Admin, Role.Manager, Role.Operative, Role.ReadOnly, Role.Customer)
   @ApiOperation({
-    summary: "Change own password",
+    summary: 'Change own password',
     description:
       "Changes the authenticated user's password. Requires the current password for verification.",
   })
@@ -87,15 +87,15 @@ export class UsersController {
     type: ChangePasswordDto,
     examples: {
       example: {
-        summary: "Change password",
+        summary: 'Change password',
         value: {
-          currentPassword: "OldPassword1!",
-          newPassword: "NewPassword1!",
+          currentPassword: 'OldPassword1!',
+          newPassword: 'NewPassword1!',
         },
       },
     },
   })
-  @ApiOkResponse({ description: "Returns a confirmation message on success." })
+  @ApiOkResponse({ description: 'Returns a confirmation message on success.' })
   changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
     return this.usersService.changePassword(req.user.userId, dto);
   }
@@ -107,18 +107,29 @@ export class UsersController {
    * Returns paginated user audit log entries. Admin only.
    * Optional filters: userId, event
    */
-  @Get("audit-log")
+  @Get('audit-log')
   @Roles(Role.Admin)
   @ApiOperation({
-    summary: "Get user audit log",
+    summary: 'Get user audit log',
     description:
-      "Returns paginated audit trail entries for user authentication events. Admin only.",
+      'Returns paginated audit trail entries for user authentication events. Admin only.',
   })
-  @ApiQuery({ name: "userId", required: false, type: Number, description: "Filter by user ID" })
-  @ApiQuery({ name: "event", required: false, type: String, description: "Filter by event type (LOGIN_SUCCESS, LOGIN_FAILURE, LOGIN_LOCKED, ACCOUNT_LOCKED, ACCOUNT_UNLOCKED)" })
-  @ApiQuery({ name: "page", required: false, type: Number })
-  @ApiQuery({ name: "limit", required: false, type: Number })
-  @ApiOkResponse({ description: "Paged audit log entries." })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    type: Number,
+    description: 'Filter by user ID',
+  })
+  @ApiQuery({
+    name: 'event',
+    required: false,
+    type: String,
+    description:
+      'Filter by event type (LOGIN_SUCCESS, LOGIN_FAILURE, LOGIN_LOCKED, ACCOUNT_LOCKED, ACCOUNT_UNLOCKED)',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiOkResponse({ description: 'Paged audit log entries.' })
   getAuditLog(@Query() query: FindAuditLogQueryDto) {
     const parsedUserId =
       query.userId !== undefined ? parseInt(query.userId, 10) : undefined;
@@ -133,49 +144,49 @@ export class UsersController {
   @Get()
   @Roles(Role.Admin)
   @ApiOperation({
-    summary: "List all users",
+    summary: 'List all users',
     description:
-      "Returns all user records (passwordHash excluded). Admin only.",
+      'Returns all user records (passwordHash excluded). Admin only.',
   })
   @ApiQuery({
-    name: "includeInactive",
+    name: 'includeInactive',
     required: false,
     type: Boolean,
-    description: "Set to true to include deactivated accounts.",
+    description: 'Set to true to include deactivated accounts.',
   })
   @ApiQuery({
-    name: "page",
+    name: 'page',
     required: false,
     type: Number,
-    description: "Page number (1-based, default 1)",
+    description: 'Page number (1-based, default 1)',
   })
   @ApiQuery({
-    name: "limit",
+    name: 'limit',
     required: false,
     type: Number,
-    description: "Records per page (default 25, max 100)",
+    description: 'Records per page (default 25, max 100)',
   })
-  @ApiOkResponse({ description: "Paged result containing user objects." })
+  @ApiOkResponse({ description: 'Paged result containing user objects.' })
   findAll(
-    @Query("includeInactive") includeInactive?: string,
+    @Query('includeInactive') includeInactive?: string,
     @Query() paging?: PagingDto,
   ) {
-    return this.usersService.findAll(includeInactive === "true", paging);
+    return this.usersService.findAll(includeInactive === 'true', paging);
   }
 
   /**
    * GET /users/:id
    * Returns a single user (without passwordHash). Admin only.
    */
-  @Get(":id")
+  @Get(':id')
   @Roles(Role.Admin)
   @ApiOperation({
-    summary: "Get a user by ID",
+    summary: 'Get a user by ID',
     description:
-      "Returns a single user record (passwordHash excluded). Admin only.",
+      'Returns a single user record (passwordHash excluded). Admin only.',
   })
-  @ApiOkResponse({ description: "The requested user object." })
-  findOne(@Param("id", ParseIntPipe) id: number) {
+  @ApiOkResponse({ description: 'The requested user object.' })
+  findOne(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findOne(id);
   }
 
@@ -187,57 +198,57 @@ export class UsersController {
   @Post()
   @Roles(Role.Admin)
   @ApiOperation({
-    summary: "Create a new user",
+    summary: 'Create a new user',
     description:
-      "Creates a new user account with a hashed password. Admin only.",
+      'Creates a new user account with a hashed password. Admin only.',
   })
   @ApiBody({
     type: CreateUserDto,
     examples: {
       staff: {
-        summary: "Staff user (Operative)",
+        summary: 'Staff user (Operative)',
         value: {
-          username: "jsmith",
-          password: "Password1!",
-          fullName: "John Smith",
-          email: "jsmith@example.com",
-          role: "Operative",
+          username: 'jsmith',
+          password: 'Password1!',
+          fullName: 'John Smith',
+          email: 'jsmith@example.com',
+          role: 'Operative',
         },
       },
       manager: {
-        summary: "Manager user",
+        summary: 'Manager user',
         value: {
-          username: "sarahm",
-          password: "Password1!",
-          fullName: "Sarah Mills",
-          email: "sarahm@example.com",
-          role: "Manager",
+          username: 'sarahm',
+          password: 'Password1!',
+          fullName: 'Sarah Mills',
+          email: 'sarahm@example.com',
+          role: 'Manager',
         },
       },
       readOnly: {
-        summary: "Read-only user",
+        summary: 'Read-only user',
         value: {
-          username: "viewer01",
-          password: "Password1!",
-          fullName: "View Only",
-          email: "viewer@example.com",
-          role: "ReadOnly",
+          username: 'viewer01',
+          password: 'Password1!',
+          fullName: 'View Only',
+          email: 'viewer@example.com',
+          role: 'ReadOnly',
         },
       },
       customer: {
-        summary: "Customer portal user",
+        summary: 'Customer portal user',
         value: {
-          username: "cust_acme",
-          password: "Password1!",
-          fullName: "ACME Contact",
-          email: "contact@acme.com",
-          role: "Customer",
+          username: 'cust_acme',
+          password: 'Password1!',
+          fullName: 'ACME Contact',
+          email: 'contact@acme.com',
+          role: 'Customer',
           linkedCustomerId: 42,
         },
       },
     },
   })
-  @ApiCreatedResponse({ description: "The newly created user object." })
+  @ApiCreatedResponse({ description: 'The newly created user object.' })
   create(@Body() dto: CreateUserDto, @Request() req: any) {
     return this.usersService.create(dto, req.user?.username);
   }
@@ -246,44 +257,44 @@ export class UsersController {
    * PUT /users/:id
    * Full update of a user record (username, role, active flag, etc.). Admin only.
    */
-  @Put(":id")
+  @Put(':id')
   @Roles(Role.Admin)
   @ApiOperation({
-    summary: "Update a user",
+    summary: 'Update a user',
     description:
-      "Updates username, role, email, full name, active flag, or password. Admin only.",
+      'Updates username, role, email, full name, active flag, or password. Admin only.',
   })
   @ApiBody({
     type: UpdateUserDto,
     examples: {
       updateRole: {
-        summary: "Promote to Manager",
+        summary: 'Promote to Manager',
         value: {
-          role: "Manager",
+          role: 'Manager',
         },
       },
       updateEmail: {
-        summary: "Update email address",
+        summary: 'Update email address',
         value: {
-          email: "newemail@example.com",
+          email: 'newemail@example.com',
         },
       },
       updateCustomerLink: {
-        summary: "Link a customer user to a different customer account",
+        summary: 'Link a customer user to a different customer account',
         value: {
           linkedCustomerId: 99,
         },
       },
       deactivate: {
-        summary: "Deactivate account inline",
+        summary: 'Deactivate account inline',
         value: {
           isActive: false,
         },
       },
     },
   })
-  @ApiOkResponse({ description: "The updated user object." })
-  update(@Param("id", ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
+  @ApiOkResponse({ description: 'The updated user object.' })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
     return this.usersService.update(id, dto);
   }
 
@@ -292,16 +303,16 @@ export class UsersController {
    * Permanently deletes a user account. Admin only.
    * Cannot delete your own account.
    */
-  @Delete(":id")
+  @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @Roles(Role.Admin)
   @ApiOperation({
-    summary: "Delete a user",
+    summary: 'Delete a user',
     description:
-      "Permanently deletes a user account. Admin only. You cannot delete your own account.",
+      'Permanently deletes a user account. Admin only. You cannot delete your own account.',
   })
-  @ApiOkResponse({ description: "Returns a confirmation message on success." })
-  remove(@Param("id", ParseIntPipe) id: number, @Request() req: any) {
+  @ApiOkResponse({ description: 'Returns a confirmation message on success.' })
+  remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.usersService.remove(id, req.user.userId);
   }
 
@@ -309,16 +320,16 @@ export class UsersController {
    * PATCH /users/:id/deactivate
    * Soft-disables a user account. Admin only.
    */
-  @Patch(":id/deactivate")
+  @Patch(':id/deactivate')
   @HttpCode(HttpStatus.OK)
   @Roles(Role.Admin)
   @ApiOperation({
-    summary: "Deactivate a user",
+    summary: 'Deactivate a user',
     description:
-      "Soft-disables the user account (isActive = false). Admin only.",
+      'Soft-disables the user account (isActive = false). Admin only.',
   })
-  @ApiOkResponse({ description: "The deactivated user object." })
-  deactivate(@Param("id", ParseIntPipe) id: number) {
+  @ApiOkResponse({ description: 'The deactivated user object.' })
+  deactivate(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.deactivate(id);
   }
 
@@ -326,16 +337,16 @@ export class UsersController {
    * PATCH /users/:id/reactivate
    * Re-enables a previously deactivated user. Admin only.
    */
-  @Patch(":id/reactivate")
+  @Patch(':id/reactivate')
   @HttpCode(HttpStatus.OK)
   @Roles(Role.Admin)
   @ApiOperation({
-    summary: "Reactivate a user",
+    summary: 'Reactivate a user',
     description:
-      "Re-enables a previously deactivated user account (isActive = true). Admin only.",
+      'Re-enables a previously deactivated user account (isActive = true). Admin only.',
   })
-  @ApiOkResponse({ description: "The reactivated user object." })
-  reactivate(@Param("id", ParseIntPipe) id: number) {
+  @ApiOkResponse({ description: 'The reactivated user object.' })
+  reactivate(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.reactivate(id);
   }
 
@@ -343,16 +354,19 @@ export class UsersController {
    * PATCH /users/:id/unlock
    * Clears any active lockout and resets the failed login counter. Admin only.
    */
-  @Patch(":id/unlock")
+  @Patch(':id/unlock')
   @HttpCode(HttpStatus.OK)
   @Roles(Role.Admin)
   @ApiOperation({
-    summary: "Unlock a user account",
+    summary: 'Unlock a user account',
     description:
-      "Clears any active login lockout and resets the failed login counter. Admin only.",
+      'Clears any active login lockout and resets the failed login counter. Admin only.',
   })
-  @ApiOkResponse({ description: "The unlocked user object." })
-  async unlockAccount(@Param("id", ParseIntPipe) id: number, @Request() req: any) {
+  @ApiOkResponse({ description: 'The unlocked user object.' })
+  async unlockAccount(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
     const user = await this.usersService.unlockAccount(id);
     // Fire-and-forget audit entry
     this.usersService
@@ -370,28 +384,28 @@ export class UsersController {
    * PATCH /users/:id/reset-password
    * Admin sets a new password for any user without needing the current password.
    */
-  @Patch(":id/reset-password")
+  @Patch(':id/reset-password')
   @HttpCode(HttpStatus.OK)
   @Roles(Role.Admin)
   @ApiOperation({
     summary: "Reset a user's password",
     description:
-      "Allows an Admin to set a new password for any user without requiring the current password.",
+      'Allows an Admin to set a new password for any user without requiring the current password.',
   })
   @ApiBody({
     type: ResetPasswordDto,
     examples: {
       example: {
-        summary: "Reset to a new password",
+        summary: 'Reset to a new password',
         value: {
-          newPassword: "NewPassword1!",
+          newPassword: 'NewPassword1!',
         },
       },
     },
   })
-  @ApiOkResponse({ description: "Returns a confirmation message on success." })
+  @ApiOkResponse({ description: 'Returns a confirmation message on success.' })
   resetPassword(
-    @Param("id", ParseIntPipe) id: number,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: ResetPasswordDto,
   ) {
     return this.usersService.resetPassword(id, dto.newPassword);

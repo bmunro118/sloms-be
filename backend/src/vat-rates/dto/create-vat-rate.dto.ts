@@ -1,4 +1,10 @@
-import { IsDateString, IsNumber, IsString, MaxLength, Min } from "class-validator";
+import {
+  IsDateString,
+  IsNumber,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateVatRateDto {
   @IsNumber()

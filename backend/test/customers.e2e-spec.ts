@@ -1,10 +1,10 @@
-import { INestApplication } from "@nestjs/common";
-import { PrismaService } from "../src/prisma/prisma.service";
-import { Role } from "../src/users/entities/role.enum";
-import { createTestApp } from "./support/app";
-import { api, authHeader } from "./support/http";
-import { loginAllRoles } from "./support/auth";
-import { cleanupE2E, E2E_MARKER } from "./support/factories";
+import { INestApplication } from '@nestjs/common';
+import { PrismaService } from '../src/prisma/prisma.service';
+import { Role } from '../src/users/entities/role.enum';
+import { createTestApp } from './support/app';
+import { api, authHeader } from './support/http';
+import { loginAllRoles } from './support/auth';
+import { cleanupE2E, E2E_MARKER } from './support/factories';
 
 /**
  * Reference template for a full per-controller e2e matrix. Each endpoint is
@@ -22,7 +22,7 @@ import { cleanupE2E, E2E_MARKER } from "./support/factories";
  */
 const MISSING_ID = 99999999;
 
-describe("Customers (e2e)", () => {
+describe('Customers (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let tokens: Record<Role, string>;
@@ -41,44 +41,44 @@ describe("Customers (e2e)", () => {
   const as = (role: Role) => authHeader(tokens[role]);
 
   // ─── auth ─────────────────────────────────────────────────────────────────
-  describe("authentication", () => {
-    it("rejects an unauthenticated list with 401", () =>
-      api(app).get("/api/customers").expect(401));
+  describe('authentication', () => {
+    it('rejects an unauthenticated list with 401', () =>
+      api(app).get('/api/customers').expect(401));
 
-    it("rejects a garbage token with 401", () =>
-      api(app)
-        .get("/api/customers")
-        .set(authHeader("not-a-jwt"))
-        .expect(401));
+    it('rejects a garbage token with 401', () =>
+      api(app).get('/api/customers').set(authHeader('not-a-jwt')).expect(401));
   });
 
   // ─── authz (role matrix) ────────────────────────────────────────────────────
-  describe("authorization", () => {
-    it("ReadOnly can list customers (200)", () =>
-      api(app).get("/api/customers?limit=1").set(as(Role.ReadOnly)).expect(200));
-
-    it("Customer role is denied entirely (403)", () =>
-      api(app).get("/api/customers").set(as(Role.Customer)).expect(403));
-
-    it("ReadOnly cannot create a customer (403 — needs Operative+)", () =>
+  describe('authorization', () => {
+    it('ReadOnly can list customers (200)', () =>
       api(app)
-        .post("/api/customers")
+        .get('/api/customers?limit=1')
+        .set(as(Role.ReadOnly))
+        .expect(200));
+
+    it('Customer role is denied entirely (403)', () =>
+      api(app).get('/api/customers').set(as(Role.Customer)).expect(403));
+
+    it('ReadOnly cannot create a customer (403 — needs Operative+)', () =>
+      api(app)
+        .post('/api/customers')
         .set(as(Role.ReadOnly))
         .send({ companyName: `${E2E_MARKER} nope` })
         .expect(403));
 
-    it("Operative can create a customer (201)", async () => {
+    it('Operative can create a customer (201)', async () => {
       const res = await api(app)
-        .post("/api/customers")
+        .post('/api/customers')
         .set(as(Role.Operative))
         .send({ companyName: `${E2E_MARKER} Operative Co` })
         .expect(201);
       expect(res.body.customerId).toBeGreaterThan(0);
     });
 
-    it("Operative cannot suspend a customer (403 — needs Manager+)", async () => {
+    it('Operative cannot suspend a customer (403 — needs Manager+)', async () => {
       const created = await api(app)
-        .post("/api/customers")
+        .post('/api/customers')
         .set(as(Role.Operative))
         .send({ companyName: `${E2E_MARKER} ToSuspend` })
         .expect(201);
@@ -88,9 +88,9 @@ describe("Customers (e2e)", () => {
         .expect(403);
     });
 
-    it("Manager can suspend then reinstate a customer (200)", async () => {
+    it('Manager can suspend then reinstate a customer (200)', async () => {
       const created = await api(app)
-        .post("/api/customers")
+        .post('/api/customers')
         .set(as(Role.Manager))
         .send({ companyName: `${E2E_MARKER} ManagerCo` })
         .expect(201);
@@ -112,39 +112,44 @@ describe("Customers (e2e)", () => {
   });
 
   // ─── validation ─────────────────────────────────────────────────────────────
-  describe("validation (POST /customers)", () => {
+  describe('validation (POST /customers)', () => {
     const create = (body: any) =>
-      api(app).post("/api/customers").set(as(Role.Admin)).send(body);
+      api(app).post('/api/customers').set(as(Role.Admin)).send(body);
 
-    it("rejects an unknown property (forbidNonWhitelisted)", () =>
+    it('rejects an unknown property (forbidNonWhitelisted)', () =>
       create({ companyName: `${E2E_MARKER} x`, bogus: 1 }).expect(400));
 
-    it("rejects an invalid email", () =>
-      create({ companyName: `${E2E_MARKER} x`, contactEmail: "not-an-email" }).expect(
-        400,
-      ));
+    it('rejects an invalid email', () =>
+      create({
+        companyName: `${E2E_MARKER} x`,
+        contactEmail: 'not-an-email',
+      }).expect(400));
 
-    it("rejects companyName over MaxLength(200)", () =>
-      create({ companyName: `${E2E_MARKER}` + "a".repeat(201) }).expect(400));
+    it('rejects companyName over MaxLength(200)', () =>
+      create({ companyName: `${E2E_MARKER}` + 'a'.repeat(201) }).expect(400));
 
-    it("rejects accountNumber over MaxLength(20)", () =>
-      create({ companyName: `${E2E_MARKER} x`, accountNumber: "a".repeat(21) }).expect(
-        400,
-      ));
+    it('rejects accountNumber over MaxLength(20)', () =>
+      create({
+        companyName: `${E2E_MARKER} x`,
+        accountNumber: 'a'.repeat(21),
+      }).expect(400));
 
-    it("accepts a minimal valid body (only companyName)", () =>
+    it('accepts a minimal valid body (only companyName)', () =>
       create({ companyName: `${E2E_MARKER} Minimal` }).expect(201));
   });
 
   // ─── not found ──────────────────────────────────────────────────────────────
-  describe("not found", () => {
-    it("GET a missing customer → 404", () =>
-      api(app).get(`/api/customers/${MISSING_ID}`).set(as(Role.Admin)).expect(404));
+  describe('not found', () => {
+    it('GET a missing customer → 404', () =>
+      api(app)
+        .get(`/api/customers/${MISSING_ID}`)
+        .set(as(Role.Admin))
+        .expect(404));
 
-    it("GET a non-numeric id → 400 (ParseIntPipe)", () =>
-      api(app).get("/api/customers/abc").set(as(Role.Admin)).expect(400));
+    it('GET a non-numeric id → 400 (ParseIntPipe)', () =>
+      api(app).get('/api/customers/abc').set(as(Role.Admin)).expect(400));
 
-    it("GET addresses for a missing customer → 404", () =>
+    it('GET addresses for a missing customer → 404', () =>
       api(app)
         .get(`/api/customers/${MISSING_ID}/addresses/1`)
         .set(as(Role.Admin))
@@ -152,45 +157,45 @@ describe("Customers (e2e)", () => {
   });
 
   // ─── happy-path lifecycle + side effects ────────────────────────────────────
-  describe("customer + address lifecycle", () => {
+  describe('customer + address lifecycle', () => {
     let customerId: number;
     let addressId: number;
 
-    it("creates a customer", async () => {
+    it('creates a customer', async () => {
       const res = await api(app)
-        .post("/api/customers")
+        .post('/api/customers')
         .set(as(Role.Admin))
         .send({
           companyName: `${E2E_MARKER} Lifecycle Co`,
-          contactEmail: "contact@example.com",
-          band: "Dispensary",
+          contactEmail: 'contact@example.com',
+          band: 'Dispensary',
         })
         .expect(201);
       customerId = res.body.customerId;
       expect(customerId).toBeGreaterThan(0);
     });
 
-    it("updates the customer and the change is persisted", async () => {
+    it('updates the customer and the change is persisted', async () => {
       await api(app)
         .put(`/api/customers/${customerId}`)
         .set(as(Role.Admin))
-        .send({ contactName: "Updated Name" })
+        .send({ contactName: 'Updated Name' })
         .expect(200);
       const res = await api(app)
         .get(`/api/customers/${customerId}`)
         .set(as(Role.Admin))
         .expect(200);
-      expect(res.body.contactName).toBe("Updated Name");
+      expect(res.body.contactName).toBe('Updated Name');
     });
 
-    it("adds an address and lists it back", async () => {
+    it('adds an address and lists it back', async () => {
       const res = await api(app)
         .post(`/api/customers/${customerId}/addresses`)
         .set(as(Role.Admin))
         .send({
-          delAddressLn1: "1 Test Street",
-          delTownOrCity: "Testville",
-          delPostCode: "TE1 1ST",
+          delAddressLn1: '1 Test Street',
+          delTownOrCity: 'Testville',
+          delPostCode: 'TE1 1ST',
           defaultAddress: true,
         })
         .expect(201);
@@ -204,26 +209,28 @@ describe("Customers (e2e)", () => {
       expect(list.body.data.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("fetches a single address", () =>
+    it('fetches a single address', () =>
       api(app)
         .get(`/api/customers/${customerId}/addresses/${addressId}`)
         .set(as(Role.Admin))
         .expect(200));
 
-    it("updates the address", () =>
+    it('updates the address', () =>
       api(app)
         .put(`/api/customers/${customerId}/addresses/${addressId}`)
         .set(as(Role.Admin))
-        .send({ delPostCode: "TE2 2ND" })
+        .send({ delPostCode: 'TE2 2ND' })
         .expect(200));
 
-    it("sets the address as default", () =>
+    it('sets the address as default', () =>
       api(app)
-        .patch(`/api/customers/${customerId}/addresses/${addressId}/set-default`)
+        .patch(
+          `/api/customers/${customerId}/addresses/${addressId}/set-default`,
+        )
         .set(as(Role.Admin))
         .expect(200));
 
-    it("soft-deletes the address (Manager+)", () =>
+    it('soft-deletes the address (Manager+)', () =>
       api(app)
         .delete(`/api/customers/${customerId}/addresses/${addressId}`)
         .set(as(Role.Manager))

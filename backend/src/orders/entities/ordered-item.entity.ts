@@ -1,5 +1,5 @@
-import type { Order } from "./order.entity";
-import { ItemStatus } from "../enums/item-status.enum";
+import type { Order } from './order.entity';
+import { ItemStatus } from '../enums/item-status.enum';
 
 export interface OrderedItem {
   serialNumber: string;

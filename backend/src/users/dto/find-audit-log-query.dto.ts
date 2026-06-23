@@ -1,6 +1,6 @@
-import { IsOptional, IsString } from "class-validator";
-import { ApiPropertyOptional } from "@nestjs/swagger";
-import { PagingDto } from "../../common/paging";
+import { IsOptional, IsString } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { PagingDto } from '../../common/paging';
 
 /**
  * Query parameters for GET /users/audit-log.
@@ -11,14 +11,14 @@ import { PagingDto } from "../../common/paging";
  * list via FindOrdersQueryDto.
  */
 export class FindAuditLogQueryDto extends PagingDto {
-  @ApiPropertyOptional({ description: "Filter by user ID" })
+  @ApiPropertyOptional({ description: 'Filter by user ID' })
   @IsOptional()
   @IsString()
   userId?: string;
 
   @ApiPropertyOptional({
     description:
-      "Filter by event type (LOGIN_SUCCESS, LOGIN_FAILURE, LOGIN_LOCKED, ACCOUNT_LOCKED, ACCOUNT_UNLOCKED)",
+      'Filter by event type (LOGIN_SUCCESS, LOGIN_FAILURE, LOGIN_LOCKED, ACCOUNT_LOCKED, ACCOUNT_UNLOCKED)',
   })
   @IsOptional()
   @IsString()

@@ -197,9 +197,16 @@ describe('AuthService', () => {
       mockUsersService.findByUsername.mockResolvedValue(user);
       mockJwtService.sign.mockReturnValue('new-token');
 
-      const result = await service.completePasswordChange(1, 'testuser', 'NewPass1!');
+      const result = await service.completePasswordChange(
+        1,
+        'testuser',
+        'NewPass1!',
+      );
 
-      expect(mockUsersService.setNewPasswordAndClearFlag).toHaveBeenCalledWith(1, 'NewPass1!');
+      expect(mockUsersService.setNewPasswordAndClearFlag).toHaveBeenCalledWith(
+        1,
+        'NewPass1!',
+      );
       expect(mockUsersService.writeAuditLog).toHaveBeenCalledWith(
         'testuser',
         AuditEvent.PASSWORD_CHANGED,
@@ -215,7 +222,12 @@ describe('AuthService', () => {
 
   describe('verifyToken', () => {
     it('returns decoded payload on valid token', () => {
-      const payload = { sub: 1, username: 'testuser', role: Role.ReadOnly, linkedCustomerId: null };
+      const payload = {
+        sub: 1,
+        username: 'testuser',
+        role: Role.ReadOnly,
+        linkedCustomerId: null,
+      };
       mockJwtService.verify.mockReturnValue(payload);
 
       expect(service.verifyToken('valid-token')).toEqual(payload);
@@ -226,7 +238,9 @@ describe('AuthService', () => {
         throw new Error('invalid');
       });
 
-      expect(() => service.verifyToken('bad-token')).toThrow(UnauthorizedException);
+      expect(() => service.verifyToken('bad-token')).toThrow(
+        UnauthorizedException,
+      );
     });
   });
 });

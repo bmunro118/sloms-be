@@ -1,6 +1,6 @@
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 /**
  * Cross-spec endpoint-coverage recorder.
@@ -14,7 +14,7 @@ import * as path from "path";
  * Aggregation across spec files only works when Jest runs them in a single
  * worker — jest-e2e.json sets `maxWorkers: 1` for exactly this reason.
  */
-export const HITS_FILE = path.join(os.tmpdir(), "sloms-e2e-coverage-hits.txt");
+export const HITS_FILE = path.join(os.tmpdir(), 'sloms-e2e-coverage-hits.txt');
 
 /** Remove the hits file. Called from test/support/global-setup.js per run. */
 export function resetHits(): void {
@@ -27,26 +27,26 @@ export function resetHits(): void {
 
 /** Record one exercised route. `url` may include a query string; it is stripped. */
 export function recordHit(method: string, url: string): void {
-  const pathOnly = url.split("?")[0];
+  const pathOnly = url.split('?')[0];
   fs.appendFileSync(HITS_FILE, `${method.toUpperCase()} ${pathOnly}\n`);
 }
 
 /** Load every recorded `METHOD path` hit (deduplicated). */
 export function loadHits(): { method: string; path: string }[] {
-  let raw = "";
+  let raw = '';
   try {
-    raw = fs.readFileSync(HITS_FILE, "utf8");
+    raw = fs.readFileSync(HITS_FILE, 'utf8');
   } catch {
     return [];
   }
   const seen = new Set<string>();
   const out: { method: string; path: string }[] = [];
-  for (const line of raw.split("\n")) {
+  for (const line of raw.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || seen.has(trimmed)) continue;
     seen.add(trimmed);
-    const [method, ...rest] = trimmed.split(" ");
-    out.push({ method, path: rest.join(" ") });
+    const [method, ...rest] = trimmed.split(' ');
+    out.push({ method, path: rest.join(' ') });
   }
   return out;
 }

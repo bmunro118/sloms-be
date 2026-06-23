@@ -1,16 +1,13 @@
-import {
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
-import { PagingDto, PagedResult } from "../common/paging";
-import { PrismaService } from "../prisma/prisma.service";
-import { serializePrisma } from "../prisma/prisma-serializer";
-import { Customer } from "./entities/customer.entity";
-import { CustomerAddress } from "./entities/customer-address.entity";
-import { CreateCustomerDto } from "./dto/create-customer.dto";
-import { UpdateCustomerDto } from "./dto/update-customer.dto";
-import { CreateCustomerAddressDto } from "./dto/create-customer-address.dto";
-import { UpdateCustomerAddressDto } from "./dto/update-customer-address.dto";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PagingDto, PagedResult } from '../common/paging';
+import { PrismaService } from '../prisma/prisma.service';
+import { serializePrisma } from '../prisma/prisma-serializer';
+import { Customer } from './entities/customer.entity';
+import { CustomerAddress } from './entities/customer-address.entity';
+import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { CreateCustomerAddressDto } from './dto/create-customer-address.dto';
+import { UpdateCustomerAddressDto } from './dto/update-customer-address.dto';
 
 @Injectable()
 export class CustomersService {
@@ -24,14 +21,18 @@ export class CustomersService {
     const [customers, total] = await Promise.all([
       this.prisma.customer.findMany({
         where,
-        orderBy: { companyName: "asc" },
+        orderBy: { companyName: 'asc' },
         skip: paging.offset,
         take: paging.limit,
       }),
       this.prisma.customer.count({ where }),
     ]);
 
-    return new PagedResult(serializePrisma<Customer[]>(customers), total, paging);
+    return new PagedResult(
+      serializePrisma<Customer[]>(customers),
+      total,
+      paging,
+    );
   }
 
   async findOne(id: number): Promise<Customer> {
@@ -101,7 +102,7 @@ export class CustomersService {
     const [addresses, total] = await Promise.all([
       this.prisma.customerAddress.findMany({
         where,
-        orderBy: [{ defaultAddress: "desc" }, { addressId: "asc" }],
+        orderBy: [{ defaultAddress: 'desc' }, { addressId: 'asc' }],
         skip: paging.offset,
         take: paging.limit,
       }),

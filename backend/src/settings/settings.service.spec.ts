@@ -89,7 +89,9 @@ describe('SettingsService', () => {
   describe('findOne', () => {
     it('throws NotFoundException when setting does not exist', async () => {
       mockPrisma.globalSetting.findUnique.mockResolvedValue(null);
-      await expect(service.findOne('missing.key')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('missing.key')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('returns the setting when found', async () => {
@@ -102,7 +104,9 @@ describe('SettingsService', () => {
   describe('update', () => {
     it('throws NotFoundException when setting does not exist', async () => {
       mockPrisma.globalSetting.findUnique.mockResolvedValue(null);
-      await expect(service.update('missing.key', { val: 'x' })).rejects.toThrow(NotFoundException);
+      await expect(service.update('missing.key', { val: 'x' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('updates and returns the setting', async () => {
@@ -125,21 +129,27 @@ describe('SettingsService', () => {
     });
 
     it('returns null when val is null', async () => {
-      mockPrisma.globalSetting.findUnique.mockResolvedValue(makeSetting({ val: null }));
+      mockPrisma.globalSetting.findUnique.mockResolvedValue(
+        makeSetting({ val: null }),
+      );
       const val = await service.getValue('site.name');
       expect(val).toBeNull();
     });
 
     it('throws NotFoundException when setting does not exist', async () => {
       mockPrisma.globalSetting.findUnique.mockResolvedValue(null);
-      await expect(service.getValue('missing.key')).rejects.toThrow(NotFoundException);
+      await expect(service.getValue('missing.key')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
   describe('setValue', () => {
     it('throws NotFoundException when setting does not exist', async () => {
       mockPrisma.globalSetting.findUnique.mockResolvedValue(null);
-      await expect(service.setValue('missing.key', 'val')).rejects.toThrow(NotFoundException);
+      await expect(service.setValue('missing.key', 'val')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('updates the val field', async () => {
@@ -173,7 +183,9 @@ describe('SettingsService', () => {
   describe('findUserSetting', () => {
     it('throws NotFoundException when user setting does not exist', async () => {
       mockPrisma.userSetting.findUnique.mockResolvedValue(null);
-      await expect(service.findUserSetting(1, 'missing')).rejects.toThrow(NotFoundException);
+      await expect(service.findUserSetting(1, 'missing')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('returns the user setting when found', async () => {
@@ -185,9 +197,13 @@ describe('SettingsService', () => {
 
   describe('upsertUserSetting', () => {
     it('upserts and returns the user setting', async () => {
-      mockPrisma.userSetting.upsert.mockResolvedValue(makeUserSetting({ val: 'light' }));
+      mockPrisma.userSetting.upsert.mockResolvedValue(
+        makeUserSetting({ val: 'light' }),
+      );
 
-      const result = await service.upsertUserSetting(1, 'theme', { val: 'light' });
+      const result = await service.upsertUserSetting(1, 'theme', {
+        val: 'light',
+      });
 
       expect(mockPrisma.userSetting.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -203,7 +219,9 @@ describe('SettingsService', () => {
   describe('deleteUserSetting', () => {
     it('throws NotFoundException when user setting does not exist', async () => {
       mockPrisma.userSetting.findUnique.mockResolvedValue(null);
-      await expect(service.deleteUserSetting(1, 'missing')).rejects.toThrow(NotFoundException);
+      await expect(service.deleteUserSetting(1, 'missing')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('deletes the user setting', async () => {

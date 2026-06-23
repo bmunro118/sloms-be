@@ -1,4 +1,4 @@
-import type { CustomerAddress } from "./customer-address.entity";
+import type { CustomerAddress } from './customer-address.entity';
 
 export interface Customer {
   customerId: number;

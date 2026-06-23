@@ -1,9 +1,9 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
-import * as bcrypt from "bcrypt";
-import { UsersService, AuditEvent } from "../users/users.service";
-import { JwtPayload } from "./interfaces/jwt-payload.interface";
-import { User } from "../users/entities/user.entity";
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+import { UsersService, AuditEvent } from '../users/users.service';
+import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -28,16 +28,28 @@ export class AuthService {
     if (!user) {
       // Log without a userId — username may not exist
       await this.usersService
-        .writeAuditLog(username, AuditEvent.LOGIN_FAILURE, "Unknown username", undefined, ipAddress)
+        .writeAuditLog(
+          username,
+          AuditEvent.LOGIN_FAILURE,
+          'Unknown username',
+          undefined,
+          ipAddress,
+        )
         .catch(() => {});
-      throw new UnauthorizedException("Invalid username or password");
+      throw new UnauthorizedException('Invalid username or password');
     }
 
     if (!user.isActive) {
       await this.usersService
-        .writeAuditLog(username, AuditEvent.LOGIN_FAILURE, "Account inactive", user.userId, ipAddress)
+        .writeAuditLog(
+          username,
+          AuditEvent.LOGIN_FAILURE,
+          'Account inactive',
+          user.userId,
+          ipAddress,
+        )
         .catch(() => {});
-      throw new UnauthorizedException("Invalid username or password");
+      throw new UnauthorizedException('Invalid username or password');
     }
 
     // Check if the account is currently locked
@@ -70,18 +82,24 @@ export class AuthService {
           .writeAuditLog(
             username,
             AuditEvent.ACCOUNT_LOCKED,
-            "Account locked after too many failed login attempts",
+            'Account locked after too many failed login attempts',
             user.userId,
             ipAddress,
           )
           .catch(() => {});
       } else {
         await this.usersService
-          .writeAuditLog(username, AuditEvent.LOGIN_FAILURE, "Wrong password", user.userId, ipAddress)
+          .writeAuditLog(
+            username,
+            AuditEvent.LOGIN_FAILURE,
+            'Wrong password',
+            user.userId,
+            ipAddress,
+          )
           .catch(() => {});
       }
 
-      throw new UnauthorizedException("Invalid username or password");
+      throw new UnauthorizedException('Invalid username or password');
     }
 
     return user;
@@ -116,7 +134,13 @@ export class AuthService {
         scope: 'password_change',
       };
       this.usersService
-        .writeAuditLog(user.username, AuditEvent.PASSWORD_CHANGE_REQUIRED, undefined, user.userId, ipAddress)
+        .writeAuditLog(
+          user.username,
+          AuditEvent.PASSWORD_CHANGE_REQUIRED,
+          undefined,
+          user.userId,
+          ipAddress,
+        )
         .catch(() => {});
       return {
         accessToken: this.jwtService.sign(payload, { expiresIn: '15m' }),
@@ -136,7 +160,13 @@ export class AuthService {
       linkedCustomerId: user.linkedCustomerId ?? null,
     };
     this.usersService
-      .writeAuditLog(user.username, AuditEvent.LOGIN_SUCCESS, undefined, user.userId, ipAddress)
+      .writeAuditLog(
+        user.username,
+        AuditEvent.LOGIN_SUCCESS,
+        undefined,
+        user.userId,
+        ipAddress,
+      )
       .catch(() => {});
 
     return {
@@ -161,7 +191,13 @@ export class AuthService {
   ) {
     await this.usersService.setNewPasswordAndClearFlag(userId, newPassword);
     this.usersService
-      .writeAuditLog(username, AuditEvent.PASSWORD_CHANGED, undefined, userId, ipAddress)
+      .writeAuditLog(
+        username,
+        AuditEvent.PASSWORD_CHANGED,
+        undefined,
+        userId,
+        ipAddress,
+      )
       .catch(() => {});
     const user = await this.usersService.findByUsername(username);
     // user cannot be null here — we just updated it
@@ -175,7 +211,7 @@ export class AuthService {
     try {
       return this.jwtService.verify<JwtPayload>(token);
     } catch {
-      throw new UnauthorizedException("Invalid or expired token");
+      throw new UnauthorizedException('Invalid or expired token');
     }
   }
 }

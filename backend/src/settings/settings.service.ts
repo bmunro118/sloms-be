@@ -1,11 +1,11 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PagingDto, PagedResult } from "../common/paging";
-import { PrismaService } from "../prisma/prisma.service";
-import { serializePrisma } from "../prisma/prisma-serializer";
-import { GlobalSetting } from "./entities/setting.entity";
-import { UserSetting } from "./entities/user-setting.entity";
-import { UpdateSettingDto } from "./dto/update-setting.dto";
-import { UpsertUserSettingDto } from "./dto/upsert-user-setting.dto";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PagingDto, PagedResult } from '../common/paging';
+import { PrismaService } from '../prisma/prisma.service';
+import { serializePrisma } from '../prisma/prisma-serializer';
+import { GlobalSetting } from './entities/setting.entity';
+import { UserSetting } from './entities/user-setting.entity';
+import { UpdateSettingDto } from './dto/update-setting.dto';
+import { UpsertUserSettingDto } from './dto/upsert-user-setting.dto';
 
 @Injectable()
 export class SettingsService {
@@ -21,18 +21,24 @@ export class SettingsService {
     const [settings, total] = await Promise.all([
       this.prisma.globalSetting.findMany({
         where,
-        orderBy: { key: "asc" },
+        orderBy: { key: 'asc' },
         skip: paging.offset,
         take: paging.limit,
       }),
       this.prisma.globalSetting.count({ where }),
     ]);
 
-    return new PagedResult(serializePrisma<GlobalSetting[]>(settings), total, paging);
+    return new PagedResult(
+      serializePrisma<GlobalSetting[]>(settings),
+      total,
+      paging,
+    );
   }
 
   async findOne(key: string): Promise<GlobalSetting> {
-    const setting = await this.prisma.globalSetting.findUnique({ where: { key } });
+    const setting = await this.prisma.globalSetting.findUnique({
+      where: { key },
+    });
 
     if (!setting) {
       throw new NotFoundException(`Setting '${key}' not found`);
@@ -73,7 +79,7 @@ export class SettingsService {
   async findUserSettings(userId: number): Promise<UserSetting[]> {
     const settings = await this.prisma.userSetting.findMany({
       where: { userId },
-      orderBy: { key: "asc" },
+      orderBy: { key: 'asc' },
     });
 
     return serializePrisma<UserSetting[]>(settings);

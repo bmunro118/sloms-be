@@ -3,10 +3,13 @@ import {
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
-} from "@nestjs/common";
-import { chromium, Browser } from "playwright";
-import { PrismaService } from "../prisma/prisma.service";
-import { OrderBreakdownData, renderOrderBreakdownHtml } from "./order-breakdown.template";
+} from '@nestjs/common';
+import { chromium, Browser } from 'playwright';
+import { PrismaService } from '../prisma/prisma.service';
+import {
+  OrderBreakdownData,
+  renderOrderBreakdownHtml,
+} from './order-breakdown.template';
 
 @Injectable()
 export class OrderBreakdownService implements OnModuleInit, OnModuleDestroy {
@@ -36,7 +39,7 @@ export class OrderBreakdownService implements OnModuleInit, OnModuleDestroy {
         customer: true,
         deliveryAddressDetail: true,
         vatRate: true,
-        items: { where: { void: false }, orderBy: { serialNumber: "asc" } },
+        items: { where: { void: false }, orderBy: { serialNumber: 'asc' } },
       },
     });
 
@@ -56,7 +59,8 @@ export class OrderBreakdownService implements OnModuleInit, OnModuleDestroy {
         dispatchDate: order.dispatchedOn,
         customerPo: order.customerRef,
       },
-      customerAccount: order.customer?.companyName ?? String(order.customerAccount ?? ""),
+      customerAccount:
+        order.customer?.companyName ?? String(order.customerAccount ?? ''),
       invoiceAddress: this.buildInvoiceAddress(order.customer),
       deliveryAddress: this.buildDeliveryAddress(order.deliveryAddressDetail),
       generatedOn: new Date(),
@@ -64,7 +68,10 @@ export class OrderBreakdownService implements OnModuleInit, OnModuleDestroy {
         modelCode: item.modelCode,
         description: item.description,
         serialNumber: item.serialNumber,
-        patient: this.buildPatientName(item.patientSurname, item.patientInitial),
+        patient: this.buildPatientName(
+          item.patientSurname,
+          item.patientInitial,
+        ),
         refNo: item.customerRef,
         side: item.side,
         price: item.price,
@@ -79,13 +86,13 @@ export class OrderBreakdownService implements OnModuleInit, OnModuleDestroy {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private async getCompanyDetails(): Promise<OrderBreakdownData["company"]> {
+  private async getCompanyDetails(): Promise<OrderBreakdownData['company']> {
     const keys = [
-      "company.name",
-      "company.address",
-      "company.email",
-      "company.registrationNo",
-      "company.vatNo",
+      'company.name',
+      'company.address',
+      'company.email',
+      'company.registrationNo',
+      'company.vatNo',
     ];
 
     const settings = await this.prisma.globalSetting.findMany({
@@ -95,17 +102,17 @@ export class OrderBreakdownService implements OnModuleInit, OnModuleDestroy {
     const get = (key: string) =>
       settings.find((s) => s.key === key)?.val ?? null;
 
-    const rawAddress = get("company.address");
+    const rawAddress = get('company.address');
     const addressLines = rawAddress
-      ? rawAddress.split("|").map((l) => l.trim())
+      ? rawAddress.split('|').map((l) => l.trim())
       : [];
 
     return {
-      name: get("company.name") ?? "Sonic Labs",
+      name: get('company.name') ?? 'Sonic Labs',
       addressLines,
-      email: get("company.email"),
-      companyRegNo: get("company.registrationNo"),
-      vatRegNo: get("company.vatNo"),
+      email: get('company.email'),
+      companyRegNo: get('company.registrationNo'),
+      vatRegNo: get('company.vatNo'),
     };
   }
 
@@ -140,13 +147,13 @@ export class OrderBreakdownService implements OnModuleInit, OnModuleDestroy {
     initial: string | null,
   ): string | null {
     const parts = [surname, initial].filter(Boolean);
-    return parts.length > 0 ? parts.join(" ") : null;
+    return parts.length > 0 ? parts.join(' ') : null;
   }
 
   private buildTotals(
     items: { price: number | null }[],
     vatRateDecimal: any,
-  ): OrderBreakdownData["totals"] {
+  ): OrderBreakdownData['totals'] {
     const excVat = items.reduce((sum, i) => sum + (i.price ?? 0), 0);
     const vatRate = vatRateDecimal != null ? Number(vatRateDecimal) : 20;
     const vatAmount = Math.round(excVat * (vatRate / 100) * 100) / 100;
@@ -162,13 +169,13 @@ export class OrderBreakdownService implements OnModuleInit, OnModuleDestroy {
     const page = await this.browser.newPage();
     try {
       const html = renderOrderBreakdownHtml(data);
-      await page.setContent(html, { waitUntil: "load" });
+      await page.setContent(html, { waitUntil: 'load' });
       const pdf = await page.pdf({
-        format: "A4",
+        format: 'A4',
         printBackground: true,
-        margin: { top: "0", bottom: "0", left: "0", right: "0" },
+        margin: { top: '0', bottom: '0', left: '0', right: '0' },
         displayHeaderFooter: true,
-        headerTemplate: "<span></span>",
+        headerTemplate: '<span></span>',
         footerTemplate: `
           <div style="font-family:Arial,sans-serif;font-style:italic;font-size:8pt;
                       width:100%;padding:0 14mm;display:flex;justify-content:space-between;

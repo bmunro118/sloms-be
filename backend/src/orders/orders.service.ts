@@ -3,26 +3,30 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
-} from "@nestjs/common";
-import { PagingDto, PagedResult } from "../common/paging";
-import { PrismaService } from "../prisma/prisma.service";
-import { serializePrisma } from "../prisma/prisma-serializer";
-import { Order } from "./entities/order.entity";
-import { OrderedItem } from "./entities/ordered-item.entity";
-import { OrderTracking } from "./entities/order-tracking.entity";
-import { OrderStatus } from "./enums/order-status.enum";
-import { ItemStatus } from "./enums/item-status.enum";
-import { CreateOrderDto } from "./dto/create-order.dto";
-import { UpdateOrderDto } from "./dto/update-order.dto";
-import { CreateOrderedItemDto } from "./dto/create-ordered-item.dto";
-import { UpdateOrderedItemDto } from "./dto/update-ordered-item.dto";
+} from '@nestjs/common';
+import { PagingDto, PagedResult } from '../common/paging';
+import { PrismaService } from '../prisma/prisma.service';
+import { serializePrisma } from '../prisma/prisma-serializer';
+import { Order } from './entities/order.entity';
+import { OrderedItem } from './entities/ordered-item.entity';
+import { OrderTracking } from './entities/order-tracking.entity';
+import { OrderStatus } from './enums/order-status.enum';
+import { ItemStatus } from './enums/item-status.enum';
+import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderDto } from './dto/update-order.dto';
+import { CreateOrderedItemDto } from './dto/create-ordered-item.dto';
+import { UpdateOrderedItemDto } from './dto/update-ordered-item.dto';
 
 function getISOWeekYear(date: Date): { week: number; year: number } {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+  );
   const day = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  const week = Math.ceil(
+    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
   return { week, year: d.getUTCFullYear() };
 }
 
@@ -69,13 +73,12 @@ function normalizeOrderDates(dto: {
 }): { receivedOn?: Date; dispatchedOn?: Date } {
   const out: { receivedOn?: Date; dispatchedOn?: Date } = {};
   if (dto.receivedOn !== undefined) out.receivedOn = new Date(dto.receivedOn);
-  if (dto.dispatchedOn !== undefined) out.dispatchedOn = new Date(dto.dispatchedOn);
+  if (dto.dispatchedOn !== undefined)
+    out.dispatchedOn = new Date(dto.dispatchedOn);
   return out;
 }
 
-function attachComputedOrderFields(
-  raw: any,
-): Order {
+function attachComputedOrderFields(raw: any): Order {
   const activeItems = (raw.items ?? []).filter((i: any) => !i.void);
   const { itemCount, orderTotal, avgPrice } = computeOrderTotals(activeItems);
   return {
@@ -92,7 +95,7 @@ export class OrdersService {
 
   private async generateSerial(): Promise<string> {
     const { week, year } = getISOWeekYear(new Date());
-    const strWeek = String(week).padStart(2, "0");
+    const strWeek = String(week).padStart(2, '0');
     const strYear = String(year).slice(-2);
     const key = `item-${year}-${strWeek}`;
 
@@ -116,7 +119,7 @@ export class OrdersService {
       );
     }
 
-    const strCounter = String(counter).padStart(4, "0");
+    const strCounter = String(counter).padStart(4, '0');
     return `S${strYear}${strWeek}${strCounter}`;
   }
 
@@ -133,11 +136,11 @@ export class OrdersService {
         validFrom: { lte: today },
         OR: [{ validTo: null }, { validTo: { gte: today } }],
       },
-      orderBy: { validFrom: "desc" },
+      orderBy: { validFrom: 'desc' },
     });
 
     if (!vatRate) {
-      throw new BadRequestException("No active VAT rate configured");
+      throw new BadRequestException('No active VAT rate configured');
     }
 
     return vatRate.vatRateId;
@@ -147,7 +150,10 @@ export class OrdersService {
    * Recomputes order status from current item states and writes it to the DB
    * if it has changed. Appends a history row on each real transition.
    */
-  private async syncStatus(orderNumber: number, orderBatch: number): Promise<void> {
+  private async syncStatus(
+    orderNumber: number,
+    orderBatch: number,
+  ): Promise<void> {
     const raw = await this.prisma.order.findUnique({
       where: { orderNumber_orderBatch: { orderNumber, orderBatch } },
       include: { items: true },
@@ -156,7 +162,11 @@ export class OrdersService {
     if (!raw) return;
 
     const activeItems = (raw.items ?? []).filter((i) => !i.void);
-    const newStatus = computeOrderStatus(raw.void, raw.dispatchedOn, activeItems);
+    const newStatus = computeOrderStatus(
+      raw.void,
+      raw.dispatchedOn,
+      activeItems,
+    );
 
     if (newStatus === raw.status) return;
 
@@ -188,7 +198,7 @@ export class OrdersService {
       this.prisma.order.findMany({
         where,
         include: { items: true },
-        orderBy: [{ orderNumber: "desc" }, { orderBatch: "desc" }],
+        orderBy: [{ orderNumber: 'desc' }, { orderBatch: 'desc' }],
         skip: paging.offset,
         take: paging.limit,
       }),
@@ -217,7 +227,7 @@ export class OrdersService {
       this.prisma.order.findMany({
         where,
         include: { items: true },
-        orderBy: [{ orderNumber: "desc" }, { orderBatch: "desc" }],
+        orderBy: [{ orderNumber: 'desc' }, { orderBatch: 'desc' }],
         skip: paging.offset,
         take: paging.limit,
       }),
@@ -252,10 +262,15 @@ export class OrdersService {
     return attachComputedOrderFields(raw);
   }
 
-  async create(dto: CreateOrderDto, createdBy: string | null = null): Promise<Order> {
+  async create(
+    dto: CreateOrderDto,
+    createdBy: string | null = null,
+  ): Promise<Order> {
     const orderBatch = dto.orderBatch ?? 1;
     const existing = await this.prisma.order.findUnique({
-      where: { orderNumber_orderBatch: { orderNumber: dto.orderNumber, orderBatch } },
+      where: {
+        orderNumber_orderBatch: { orderNumber: dto.orderNumber, orderBatch },
+      },
     });
 
     if (existing) {
@@ -282,7 +297,12 @@ export class OrdersService {
         include: { items: true },
       }),
       this.prisma.orderStatusHistory.create({
-        data: { orderNumber: dto.orderNumber, orderBatch, status: OrderStatus.Received, changedOn: now },
+        data: {
+          orderNumber: dto.orderNumber,
+          orderBatch,
+          status: OrderStatus.Received,
+          changedOn: now,
+        },
       }),
     ]);
 
@@ -325,17 +345,31 @@ export class OrdersService {
     await this.prisma.$transaction([
       this.prisma.order.update({
         where: { orderNumber_orderBatch: { orderNumber, orderBatch } },
-        data: { void: true, voidDateStamp: now, voidedBy, status: OrderStatus.Voided, statusChangedOn: now },
+        data: {
+          void: true,
+          voidDateStamp: now,
+          voidedBy,
+          status: OrderStatus.Voided,
+          statusChangedOn: now,
+        },
       }),
       this.prisma.orderStatusHistory.create({
-        data: { orderNumber, orderBatch, status: OrderStatus.Voided, changedOn: now },
+        data: {
+          orderNumber,
+          orderBatch,
+          status: OrderStatus.Voided,
+          changedOn: now,
+        },
       }),
     ]);
 
     return this.findOne(orderNumber, orderBatch);
   }
 
-  async getTracking(orderNumber: number, orderBatch: number): Promise<OrderTracking> {
+  async getTracking(
+    orderNumber: number,
+    orderBatch: number,
+  ): Promise<OrderTracking> {
     const raw = await this.prisma.order.findUnique({
       where: { orderNumber_orderBatch: { orderNumber, orderBatch } },
       include: {
@@ -388,10 +422,20 @@ export class OrdersService {
     await this.prisma.$transaction([
       this.prisma.order.update({
         where: { orderNumber_orderBatch: { orderNumber, orderBatch } },
-        data: { dispatchedOn: now, dispatchDateStamp: now, status: OrderStatus.Dispatched, statusChangedOn: now },
+        data: {
+          dispatchedOn: now,
+          dispatchDateStamp: now,
+          status: OrderStatus.Dispatched,
+          statusChangedOn: now,
+        },
       }),
       this.prisma.orderStatusHistory.create({
-        data: { orderNumber, orderBatch, status: OrderStatus.Dispatched, changedOn: now },
+        data: {
+          orderNumber,
+          orderBatch,
+          status: OrderStatus.Dispatched,
+          changedOn: now,
+        },
       }),
     ]);
 
@@ -409,11 +453,15 @@ export class OrdersService {
   ): Promise<PagedResult<OrderedItem>> {
     const order = await this.findOne(orderNumber, orderBatch);
 
-    const where = { parentOrder: orderNumber, parentBatch: orderBatch, void: false };
+    const where = {
+      parentOrder: orderNumber,
+      parentBatch: orderBatch,
+      void: false,
+    };
     const [items, total] = await Promise.all([
       this.prisma.orderedItem.findMany({
         where,
-        orderBy: [{ serialNumber: "asc" }],
+        orderBy: [{ serialNumber: 'asc' }],
         skip: paging.offset,
         take: paging.limit,
       }),
@@ -443,7 +491,10 @@ export class OrdersService {
     const serialized = serializePrisma<OrderedItem>(item);
     return {
       ...serialized,
-      status: computeItemStatus(serialized.checkedOut, item.order?.dispatchedOn),
+      status: computeItemStatus(
+        serialized.checkedOut,
+        item.order?.dispatchedOn,
+      ),
     };
   }
 
@@ -515,7 +566,9 @@ export class OrdersService {
       throw new BadRequestException(`Item '${serialNumber}' is voided`);
     }
     if (item.checkedOut) {
-      throw new BadRequestException(`Item '${serialNumber}' is already checked out`);
+      throw new BadRequestException(
+        `Item '${serialNumber}' is already checked out`,
+      );
     }
 
     await this.prisma.orderedItem.update({
@@ -533,7 +586,9 @@ export class OrdersService {
       throw new BadRequestException(`Item '${serialNumber}' is voided`);
     }
     if (!item.checkedOut) {
-      throw new BadRequestException(`Item '${serialNumber}' is not checked out`);
+      throw new BadRequestException(
+        `Item '${serialNumber}' is not checked out`,
+      );
     }
 
     await this.prisma.orderedItem.update({

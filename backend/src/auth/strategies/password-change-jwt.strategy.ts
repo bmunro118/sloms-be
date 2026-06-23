@@ -1,8 +1,8 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { PassportStrategy } from "@nestjs/passport";
-import { ExtractJwt, Strategy } from "passport-jwt";
-import { Request } from "express";
-import { JwtPayload } from "../interfaces/jwt-payload.interface";
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { Request } from 'express';
+import { JwtPayload } from '../interfaces/jwt-payload.interface';
 
 /**
  * Passport strategy used exclusively for the POST /auth/change-password endpoint.
@@ -12,7 +12,7 @@ import { JwtPayload } from "../interfaces/jwt-payload.interface";
 @Injectable()
 export class PasswordChangeJwtStrategy extends PassportStrategy(
   Strategy,
-  "jwt-password-change",
+  'jwt-password-change',
 ) {
   constructor() {
     super({
@@ -22,13 +22,13 @@ export class PasswordChangeJwtStrategy extends PassportStrategy(
         (req: Request) => req?.cookies?.pc_token ?? null,
       ]),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || "sloms_jwt_secret_change_me",
+      secretOrKey: process.env.JWT_SECRET || 'sloms_jwt_secret_change_me',
     });
   }
 
   async validate(payload: JwtPayload) {
-    if (payload.scope !== "password_change") {
-      throw new UnauthorizedException("Invalid token scope");
+    if (payload.scope !== 'password_change') {
+      throw new UnauthorizedException('Invalid token scope');
     }
     return {
       userId: payload.sub,
