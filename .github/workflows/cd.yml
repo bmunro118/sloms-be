@@ -1,10 +1,14 @@
 name: CD
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch: # allow manual re-deploys from the Actions tab
+  # Manual-only deploys: this private repo's plan doesn't support environment
+  # approval gates, so we gate by requiring a deliberate "Run workflow" click
+  # from the Actions tab (against the main branch) instead of auto-deploying on
+  # merge. To switch to auto-deploy on merge, uncomment the `push` trigger below.
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch: {}
 
 # Never run two deploys against the same environment at once.
 concurrency:

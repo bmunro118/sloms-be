@@ -5,7 +5,7 @@ Two workflows live in `.github/workflows`:
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `ci.yml` | PRs + pushes to any branch except `main` | `npm ci`, `prisma generate`, lint, test, `nest build` |
-| `cd.yml` | push to `main` (and manual `workflow_dispatch`) | Build & push the Docker image to ACR, then `az containerapp update` |
+| `cd.yml` | manual `workflow_dispatch` (run against `main`) | Build & push the Docker image to ACR, then `az containerapp update` |
 
 Tests and the production build also run *inside* `backend/Dockerfile`, so a CD run can't deploy an image whose tests fail.
 
