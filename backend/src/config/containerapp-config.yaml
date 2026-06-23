@@ -1,66 +1,68 @@
-apiVersion: app.containerservice.azure.com/v1beta1
-kind: ContainerApp
-metadata:
-  name: slomsapi
+# =============================================================================
+# Azure Container App spec for `slomsapi`.
+#
+# Valid input for:  az containerapp create --yaml <this-file>
+#                   az containerapp update --yaml <this-file>
+# Schema reference:  https://aka.ms/azure-container-apps-yaml
+#
+# Secrets are NOT stored here. `database-url` and `jwt-secret` are resolved at
+# runtime from Azure Key Vault (`sloms-kv`) using the app's system-assigned
+# managed identity, which has get/list on those secrets. The same identity is
+# used to pull the image from ACR (AcrPull), so no registry password is stored.
+#
+# The image tag below is the deploy baseline; the CD workflow (.github/workflows
+# /cd.yml) overrides it per-commit via `az containerapp update --image`.
+# =============================================================================
+location: uksouth
 identity:
   type: SystemAssigned
 properties:
-  environmentId: /subscriptions/295f53a3-9253-4547-8062-51d425160903/resourceGroups/sloms/providers/Microsoft.App/managedEnvironments/slomsapi-env
+  managedEnvironmentId: /subscriptions/295f53a3-9253-4547-8062-51d425160903/resourceGroups/sloms/providers/Microsoft.App/managedEnvironments/slomsapi-env
   workloadProfileName: Consumption
-configuration:
-  # ----------------------------------------------------------------------------
-  # Secrets are NOT stored in this file. They are resolved from Azure Key Vault
-  # at runtime using the Container App's system-assigned managed identity.
-  #
-  # Prerequisites (one-time setup, see deploy-to-containerapp.ps1):
-  #   1. A Key Vault exists with the secrets `db-password` and `db-username`.
-  #   2. The Container App's system-assigned identity has the
-  #      "Key Vault Secrets User" role on that vault.
-  #
-  # NOTE: the system-assigned identity does not exist until the app is created
-  # once. For a first-time deploy, create the app, grant the identity access to
-  # the vault, then re-run the deploy so the keyVaultUrl references resolve.
-  # ----------------------------------------------------------------------------
-  secrets:
-    - name: db-password
-      keyVaultUrl: "https://sloms-kv.vault.azure.net/secrets/db-password"
-      identity: system
-    - name: db-username
-      keyVaultUrl: "https://sloms-kv.vault.azure.net/secrets/db-username"
-      identity: system
-  ingress:
-    external: true
-    targetPort: 3000
-    traffic:
-      - weight: 100
-        revisionName: slomsapi-rev-00001
-        label: production
-template:
-  containers:
-    - name: slomsapi
-      image: slomsacregistry2026.azurecr.io/slomsapi:latest
-      env:
-        - name: DB_HOST
-          value: "sloms.database.windows.net"
-        - name: DB_PORT
-          value: "1433"
-        - name: DB_USERNAME
-          secretRef: db-username
-        - name: DB_PASSWORD
-          secretRef: db-password
-        - name: DB_DATABASE
-          value: "slomsdb"
-        - name: DB_ENCRYPT
-          value: true
-        - name: DB_TRUST_SERVER_CERTIFICATE
-          value: true
-      resources:
-        cpu: 100m
-        memoryGiB: 0.5
-scale:
-  minReplicas: 1
-  maxReplicas: 3
-rules:
-  - type: http
-    metadata:
-      concurrentRequests: "50"
+  configuration:
+    activeRevisionsMode: Single
+    secrets:
+      - name: database-url
+        keyVaultUrl: https://sloms-kv.vault.azure.net/secrets/database-url
+        identity: system
+      - name: jwt-secret
+        keyVaultUrl: https://sloms-kv.vault.azure.net/secrets/jwt-secret
+        identity: system
+    registries:
+      - server: slomsacregistry2026.azurecr.io
+        identity: system
+    ingress:
+      external: true
+      targetPort: 3000
+      transport: Auto
+      allowInsecure: false
+      traffic:
+        - latestRevision: true
+          weight: 100
+  template:
+    containers:
+      - name: slomsapi
+        image: slomsacregistry2026.azurecr.io/slomsapi:latest
+        # The app reads DATABASE_URL (src/config/database.config.ts). PG* vars
+        # are used by entrypoint.sh (pg_isready / migrations / seed).
+        env:
+          - name: NODE_ENV
+            value: production
+          - name: DATABASE_URL
+            secretRef: database-url
+          - name: JWT_SECRET
+            secretRef: jwt-secret
+          - name: JWT_EXPIRES_IN
+            value: "8h"
+          - name: PGHOST
+            value: sloms-postgres.postgres.database.azure.com
+          - name: PGPORT
+            value: "5432"
+          - name: PGUSER
+            value: slomsadmin
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+    scale:
+      minReplicas: 0
+      maxReplicas: 10
