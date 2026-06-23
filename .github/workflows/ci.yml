@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main # main is covered by the CD workflow, which also runs lint/test/build
+
+# Cancel in-progress runs for the same ref when a new commit is pushed.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  build-test:
+    name: Lint, test & build
+    runs-on: ubuntu-latest
+    env:
+      # prisma generate (postinstall) does not connect, but the config expects the
+      # variable to be present. A dummy URL keeps unit tests hermetic (no live DB).
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/slomsdb
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=./prisma/schema.prisma
+
+      - name: Lint
+        # Call eslint directly (the `lint` script auto-fixes; CI should fail, not fix).
+        run: npx eslint "{src,apps,libs,test}/**/*.ts" --max-warnings 0
+
+      - name: Test
+        run: npm test -- --passWithNoTests --ci
+
+      - name: Build
+        run: npx nest build

@@ -1,5 +1,5 @@
-import { OrderStatus } from "../enums/order-status.enum";
-import { ItemStatus } from "../enums/item-status.enum";
+import { OrderStatus } from '../enums/order-status.enum';
+import { ItemStatus } from '../enums/item-status.enum';
 
 export interface TrackingItem {
   serialNumber: string;

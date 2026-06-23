@@ -1,5 +1,5 @@
-import { Module } from "@nestjs/common";
-import { OrderBreakdownService } from "./order-breakdown.service";
+import { Module } from '@nestjs/common';
+import { OrderBreakdownService } from './order-breakdown.service';
 
 @Module({
   providers: [OrderBreakdownService],

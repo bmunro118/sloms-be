@@ -1,4 +1,4 @@
-export type RevisionStatus = "draft" | "active" | "archived";
+export type RevisionStatus = 'draft' | 'active' | 'archived';
 
 export interface PriceListItem {
   itemId: string;

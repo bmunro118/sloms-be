@@ -1,4 +1,11 @@
-import { IsString, IsEmail, IsOptional, MaxLength, IsBoolean, IsInt } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  MaxLength,
+  IsBoolean,
+  IsInt,
+} from 'class-validator';
 
 export class CreateCustomerAddressDto {
   @IsOptional()

@@ -133,7 +133,11 @@ describe('UsersService', () => {
       mockPrisma.user.findUnique.mockResolvedValue(makeDbUser());
 
       await expect(
-        service.create({ username: 'testuser', password: 'pass', role: Role.ReadOnly }),
+        service.create({
+          username: 'testuser',
+          password: 'pass',
+          role: Role.ReadOnly,
+        }),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -141,7 +145,11 @@ describe('UsersService', () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.create({ username: 'newuser', password: 'pass', role: Role.Customer }),
+        service.create({
+          username: 'newuser',
+          password: 'pass',
+          role: Role.Customer,
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -163,7 +171,11 @@ describe('UsersService', () => {
       const created = makeDbUser({ mustChangePassword: true });
       mockPrisma.user.create.mockResolvedValue(created);
 
-      const result = await service.create({ username: 'newuser', password: 'pass', role: Role.ReadOnly });
+      const result = await service.create({
+        username: 'newuser',
+        password: 'pass',
+        role: Role.ReadOnly,
+      });
 
       expect(bcrypt.hash).toHaveBeenCalledWith('pass', 12);
       expect(mockPrisma.user.create).toHaveBeenCalledWith(
@@ -199,7 +211,9 @@ describe('UsersService', () => {
   describe('update', () => {
     it('throws NotFoundException when user does not exist', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      await expect(service.update(99, { username: 'x' })).rejects.toThrow(NotFoundException);
+      await expect(service.update(99, { username: 'x' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws ConflictException when new username is taken by another user', async () => {
@@ -207,11 +221,15 @@ describe('UsersService', () => {
         .mockResolvedValueOnce(makeDbUser({ userId: 1, username: 'old' }))
         .mockResolvedValueOnce(makeDbUser({ userId: 2, username: 'taken' }));
 
-      await expect(service.update(1, { username: 'taken' })).rejects.toThrow(ConflictException);
+      await expect(service.update(1, { username: 'taken' })).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('throws BadRequestException when setting Customer role without linkedCustomerId', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(makeDbUser({ role: Role.Manager }));
+      mockPrisma.user.findUnique.mockResolvedValue(
+        makeDbUser({ role: Role.Manager }),
+      );
 
       await expect(
         service.update(1, { role: Role.Customer, linkedCustomerId: null }),
@@ -220,7 +238,9 @@ describe('UsersService', () => {
 
     it('updates user and returns sanitized result', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(makeDbUser());
-      mockPrisma.user.update.mockResolvedValue(makeDbUser({ fullName: 'Updated' }));
+      mockPrisma.user.update.mockResolvedValue(
+        makeDbUser({ fullName: 'Updated' }),
+      );
 
       const result = await service.update(1, { fullName: 'Updated' });
       expect(result.fullName).toBe('Updated');
@@ -234,7 +254,10 @@ describe('UsersService', () => {
     it('throws NotFoundException when user does not exist', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       await expect(
-        service.changePassword(99, { currentPassword: 'old', newPassword: 'new' }),
+        service.changePassword(99, {
+          currentPassword: 'old',
+          newPassword: 'new',
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -243,7 +266,10 @@ describe('UsersService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(
-        service.changePassword(1, { currentPassword: 'wrong', newPassword: 'new' }),
+        service.changePassword(1, {
+          currentPassword: 'wrong',
+          newPassword: 'new',
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -252,7 +278,10 @@ describe('UsersService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockPrisma.user.update.mockResolvedValue(makeDbUser());
 
-      const result = await service.changePassword(1, { currentPassword: 'old', newPassword: 'new' });
+      const result = await service.changePassword(1, {
+        currentPassword: 'old',
+        newPassword: 'new',
+      });
       expect(result.message).toMatch(/success/i);
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -296,7 +325,10 @@ describe('UsersService', () => {
       await service.recordLogin(1);
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ failedLoginCount: 0, lockedUntil: null }),
+          data: expect.objectContaining({
+            failedLoginCount: 0,
+            lockedUntil: null,
+          }),
         }),
       );
     });
@@ -309,7 +341,9 @@ describe('UsersService', () => {
     });
 
     it('increments failedLoginCount', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(makeDbUser({ failedLoginCount: 2 }));
+      mockPrisma.user.findUnique.mockResolvedValue(
+        makeDbUser({ failedLoginCount: 2 }),
+      );
       mockPrisma.user.update.mockResolvedValue({});
       await service.recordFailedLogin(1);
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
@@ -348,12 +382,18 @@ describe('UsersService', () => {
   describe('unlockAccount', () => {
     it('throws NotFoundException when user does not exist', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      await expect(service.unlockAccount(99)).rejects.toThrow(NotFoundException);
+      await expect(service.unlockAccount(99)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('resets failedLoginCount and lockedUntil', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(makeDbUser({ failedLoginCount: 5 }));
-      mockPrisma.user.update.mockResolvedValue(makeDbUser({ failedLoginCount: 0, lockedUntil: null }));
+      mockPrisma.user.findUnique.mockResolvedValue(
+        makeDbUser({ failedLoginCount: 5 }),
+      );
+      mockPrisma.user.update.mockResolvedValue(
+        makeDbUser({ failedLoginCount: 0, lockedUntil: null }),
+      );
 
       const result = await service.unlockAccount(1);
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
@@ -378,12 +418,16 @@ describe('UsersService', () => {
     });
 
     it('deletes user and returns confirmation message', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(makeDbUser({ userId: 2, username: 'other' }));
+      mockPrisma.user.findUnique.mockResolvedValue(
+        makeDbUser({ userId: 2, username: 'other' }),
+      );
       mockPrisma.user.delete.mockResolvedValue({});
 
       const result = await service.remove(2, 1);
       expect(result.message).toMatch(/other/);
-      expect(mockPrisma.user.delete).toHaveBeenCalledWith({ where: { userId: 2 } });
+      expect(mockPrisma.user.delete).toHaveBeenCalledWith({
+        where: { userId: 2 },
+      });
     });
   });
 
@@ -392,7 +436,9 @@ describe('UsersService', () => {
   describe('resetPassword', () => {
     it('throws NotFoundException when user does not exist', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      await expect(service.resetPassword(99, 'newpass')).rejects.toThrow(NotFoundException);
+      await expect(service.resetPassword(99, 'newpass')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('sets new password hash and mustChangePassword=true', async () => {
@@ -414,14 +460,24 @@ describe('UsersService', () => {
   describe('writeAuditLog', () => {
     it('creates audit log entry', async () => {
       mockPrisma.userAuditLog.create.mockResolvedValue({});
-      await service.writeAuditLog('testuser', AuditEvent.LOGIN_SUCCESS, undefined, 1, '127.0.0.1');
+      await service.writeAuditLog(
+        'testuser',
+        AuditEvent.LOGIN_SUCCESS,
+        undefined,
+        1,
+        '127.0.0.1',
+      );
       expect(mockPrisma.userAuditLog.create).toHaveBeenCalled();
     });
   });
 
   describe('getAuditLog', () => {
     it('returns paged audit log entries', async () => {
-      const entry = { auditId: 1, username: 'testuser', event: AuditEvent.LOGIN_SUCCESS };
+      const entry = {
+        auditId: 1,
+        username: 'testuser',
+        event: AuditEvent.LOGIN_SUCCESS,
+      };
       mockPrisma.userAuditLog.findMany.mockResolvedValue([entry]);
       mockPrisma.userAuditLog.count.mockResolvedValue(1);
 

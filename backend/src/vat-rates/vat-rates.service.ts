@@ -1,8 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { serializePrisma } from "../prisma/prisma-serializer";
-import { VatRate } from "./entities/vat-rate.entity";
-import { CreateVatRateDto } from "./dto/create-vat-rate.dto";
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { serializePrisma } from '../prisma/prisma-serializer';
+import { VatRate } from './entities/vat-rate.entity';
+import { CreateVatRateDto } from './dto/create-vat-rate.dto';
 
 @Injectable()
 export class VatRatesService {
@@ -10,7 +14,7 @@ export class VatRatesService {
 
   async findAll(): Promise<VatRate[]> {
     const rates = await this.prisma.vatRate.findMany({
-      orderBy: { validFrom: "desc" },
+      orderBy: { validFrom: 'desc' },
     });
     return serializePrisma<VatRate[]>(rates);
   }
@@ -24,11 +28,11 @@ export class VatRatesService {
         validFrom: { lte: today },
         OR: [{ validTo: null }, { validTo: { gte: today } }],
       },
-      orderBy: { validFrom: "desc" },
+      orderBy: { validFrom: 'desc' },
     });
 
     if (!rate) {
-      throw new NotFoundException("No active VAT rate found");
+      throw new NotFoundException('No active VAT rate found');
     }
 
     return serializePrisma<VatRate>(rate);
@@ -47,7 +51,9 @@ export class VatRatesService {
   }
 
   async close(vatRateId: number, validTo: string): Promise<VatRate> {
-    const existing = await this.prisma.vatRate.findUnique({ where: { vatRateId } });
+    const existing = await this.prisma.vatRate.findUnique({
+      where: { vatRateId },
+    });
 
     if (!existing) {
       throw new NotFoundException(`VAT rate #${vatRateId} not found`);

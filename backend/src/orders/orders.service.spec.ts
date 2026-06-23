@@ -94,7 +94,9 @@ describe('OrdersService', () => {
   beforeEach(async () => {
     jest.resetAllMocks();
     // $transaction([op1, op2, ...]) — execute each op and return results array
-    mockPrisma.$transaction.mockImplementation((ops: Promise<any>[]) => Promise.all(ops));
+    mockPrisma.$transaction.mockImplementation((ops: Promise<any>[]) =>
+      Promise.all(ops),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -138,12 +140,17 @@ describe('OrdersService', () => {
       await service.findAll(false, undefined, OrderStatus.InProduction);
 
       expect(mockPrisma.order.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { void: false, status: OrderStatus.InProduction } }),
+        expect.objectContaining({
+          where: { void: false, status: OrderStatus.InProduction },
+        }),
       );
     });
 
     it('computes runtime totals from items', async () => {
-      const items = [makeItem({ price: 100, void: false }), makeItem({ serialNumber: 'S260010002', price: 200, void: false })];
+      const items = [
+        makeItem({ price: 100, void: false }),
+        makeItem({ serialNumber: 'S260010002', price: 200, void: false }),
+      ];
       mockPrisma.order.findMany.mockResolvedValue([makeOrder({ items })]);
       mockPrisma.order.count.mockResolvedValue(1);
 
@@ -190,7 +197,13 @@ describe('OrdersService', () => {
       await service.findByCustomer(5, false, undefined, OrderStatus.Dispatched);
 
       expect(mockPrisma.order.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { customerAccount: 5, void: false, status: OrderStatus.Dispatched } }),
+        expect.objectContaining({
+          where: {
+            customerAccount: 5,
+            void: false,
+            status: OrderStatus.Dispatched,
+          },
+        }),
       );
     });
   });
@@ -221,12 +234,20 @@ describe('OrdersService', () => {
   describe('getTracking', () => {
     it('throws NotFoundException when order does not exist', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      await expect(service.getTracking(1001, 1)).rejects.toThrow(NotFoundException);
+      await expect(service.getTracking(1001, 1)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('returns order identity and current status', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(
-        makeOrder({ customerRef: 'SS-REF-001', status: OrderStatus.InProduction, statusChangedOn: new Date(), items: [], statusHistory: [] }),
+        makeOrder({
+          customerRef: 'SS-REF-001',
+          status: OrderStatus.InProduction,
+          statusChangedOn: new Date(),
+          items: [],
+          statusHistory: [],
+        }),
       );
 
       const result = await service.getTracking(1001, 1);
@@ -245,7 +266,7 @@ describe('OrdersService', () => {
         makeOrder({
           items: [],
           statusHistory: [
-            { id: 1, status: OrderStatus.Received,     changedOn: t1 },
+            { id: 1, status: OrderStatus.Received, changedOn: t1 },
             { id: 2, status: OrderStatus.InProduction, changedOn: t2 },
           ],
         }),
@@ -254,13 +275,19 @@ describe('OrdersService', () => {
       const result = await service.getTracking(1001, 1);
 
       expect(result.history).toHaveLength(2);
-      expect(result.history[0]).toEqual({ status: OrderStatus.Received,     changedOn: t1 });
-      expect(result.history[1]).toEqual({ status: OrderStatus.InProduction, changedOn: t2 });
+      expect(result.history[0]).toEqual({
+        status: OrderStatus.Received,
+        changedOn: t1,
+      });
+      expect(result.history[1]).toEqual({
+        status: OrderStatus.InProduction,
+        changedOn: t2,
+      });
     });
 
     it('excludes voided items and computes item status', async () => {
-      const activeItem  = makeItem({ checkedOut: true,  void: false });
-      const voidedItem  = makeItem({ serialNumber: 'SN9999999', void: true });
+      const activeItem = makeItem({ checkedOut: true, void: false });
+      const voidedItem = makeItem({ serialNumber: 'SN9999999', void: true });
       mockPrisma.order.findUnique.mockResolvedValue(
         makeOrder({ items: [activeItem, voidedItem], statusHistory: [] }),
       );
@@ -273,7 +300,11 @@ describe('OrdersService', () => {
     });
 
     it('exposes only serialNumber, description, side and status on items', async () => {
-      const item = makeItem({ description: 'ITE Standard', side: 'R', checkedOut: false });
+      const item = makeItem({
+        description: 'ITE Standard',
+        side: 'R',
+        checkedOut: false,
+      });
       mockPrisma.order.findUnique.mockResolvedValue(
         makeOrder({ items: [item], statusHistory: [] }),
       );
@@ -295,13 +326,23 @@ describe('OrdersService', () => {
     it('throws BadRequestException when order already exists', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(makeOrder());
       await expect(
-        service.create({ orderNumber: 1001, orderBatch: 1, customerAccount: 1 } as any),
+        service.create({
+          orderNumber: 1001,
+          orderBatch: 1,
+          customerAccount: 1,
+        } as any),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('defaults orderBatch to 1 when not provided', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      mockPrisma.vatRate.findFirst.mockResolvedValue({ vatRateId: 1, rate: 20, label: 'Standard UK', validFrom: new Date(), validTo: null });
+      mockPrisma.vatRate.findFirst.mockResolvedValue({
+        vatRateId: 1,
+        rate: 20,
+        label: 'Standard UK',
+        validFrom: new Date(),
+        validTo: null,
+      });
       mockPrisma.order.create.mockResolvedValue(makeOrder());
 
       await service.create({ orderNumber: 1001, customerAccount: 1 } as any);
@@ -315,7 +356,13 @@ describe('OrdersService', () => {
 
     it('sets initial status to Received and records statusChangedOn', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      mockPrisma.vatRate.findFirst.mockResolvedValue({ vatRateId: 1, rate: 20, label: 'Standard UK', validFrom: new Date(), validTo: null });
+      mockPrisma.vatRate.findFirst.mockResolvedValue({
+        vatRateId: 1,
+        rate: 20,
+        label: 'Standard UK',
+        validFrom: new Date(),
+        validTo: null,
+      });
       mockPrisma.order.create.mockResolvedValue(makeOrder());
 
       await service.create({ orderNumber: 1001, customerAccount: 1 } as any);
@@ -332,10 +379,21 @@ describe('OrdersService', () => {
 
     it('passes createdBy to the order create call', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      mockPrisma.vatRate.findFirst.mockResolvedValue({ vatRateId: 1, rate: 20, label: 'Standard UK', validFrom: new Date(), validTo: null });
-      mockPrisma.order.create.mockResolvedValue(makeOrder({ createdBy: 'jsmith' }));
+      mockPrisma.vatRate.findFirst.mockResolvedValue({
+        vatRateId: 1,
+        rate: 20,
+        label: 'Standard UK',
+        validFrom: new Date(),
+        validTo: null,
+      });
+      mockPrisma.order.create.mockResolvedValue(
+        makeOrder({ createdBy: 'jsmith' }),
+      );
 
-      await service.create({ orderNumber: 1001, customerAccount: 1 } as any, 'jsmith');
+      await service.create(
+        { orderNumber: 1001, customerAccount: 1 } as any,
+        'jsmith',
+      );
 
       expect(mockPrisma.order.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -346,14 +404,24 @@ describe('OrdersService', () => {
 
     it('writes a Received history entry', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      mockPrisma.vatRate.findFirst.mockResolvedValue({ vatRateId: 1, rate: 20, label: 'Standard UK', validFrom: new Date(), validTo: null });
+      mockPrisma.vatRate.findFirst.mockResolvedValue({
+        vatRateId: 1,
+        rate: 20,
+        label: 'Standard UK',
+        validFrom: new Date(),
+        validTo: null,
+      });
       mockPrisma.order.create.mockResolvedValue(makeOrder());
 
       await service.create({ orderNumber: 1001, customerAccount: 1 } as any);
 
       expect(mockPrisma.orderStatusHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ orderNumber: 1001, status: OrderStatus.Received, changedOn: expect.any(Date) }),
+          data: expect.objectContaining({
+            orderNumber: 1001,
+            status: OrderStatus.Received,
+            changedOn: expect.any(Date),
+          }),
         }),
       );
     });
@@ -364,12 +432,16 @@ describe('OrdersService', () => {
   describe('update', () => {
     it('throws NotFoundException when order does not exist', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      await expect(service.update(1001, 1, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(service.update(1001, 1, {} as any)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws BadRequestException when order is voided', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(makeOrder({ void: true }));
-      await expect(service.update(1001, 1, {} as any)).rejects.toThrow(BadRequestException);
+      await expect(service.update(1001, 1, {} as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('updates and returns the order', async () => {
@@ -394,7 +466,13 @@ describe('OrdersService', () => {
     it('sets void=true, voidedBy, status=Voided, and statusChangedOn', async () => {
       mockPrisma.order.findUnique
         .mockResolvedValueOnce(makeOrder())
-        .mockResolvedValueOnce(makeOrder({ void: true, voidedBy: 'jsmith', status: OrderStatus.Voided }));
+        .mockResolvedValueOnce(
+          makeOrder({
+            void: true,
+            voidedBy: 'jsmith',
+            status: OrderStatus.Voided,
+          }),
+        );
       mockPrisma.order.update.mockResolvedValue({});
 
       const result = await service.void(1001, 1, 'jsmith');
@@ -416,14 +494,20 @@ describe('OrdersService', () => {
     it('writes a Voided history entry', async () => {
       mockPrisma.order.findUnique
         .mockResolvedValueOnce(makeOrder())
-        .mockResolvedValueOnce(makeOrder({ void: true, status: OrderStatus.Voided }));
+        .mockResolvedValueOnce(
+          makeOrder({ void: true, status: OrderStatus.Voided }),
+        );
       mockPrisma.order.update.mockResolvedValue({});
 
       await service.void(1001, 1, 'jsmith');
 
       expect(mockPrisma.orderStatusHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ orderNumber: 1001, status: OrderStatus.Voided, changedOn: expect.any(Date) }),
+          data: expect.objectContaining({
+            orderNumber: 1001,
+            status: OrderStatus.Voided,
+            changedOn: expect.any(Date),
+          }),
         }),
       );
     });
@@ -434,18 +518,29 @@ describe('OrdersService', () => {
   describe('dispatch', () => {
     it('throws BadRequestException when order is voided', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(makeOrder({ void: true }));
-      await expect(service.dispatch(1001, 1)).rejects.toThrow(BadRequestException);
+      await expect(service.dispatch(1001, 1)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when order is already dispatched', async () => {
-      mockPrisma.order.findUnique.mockResolvedValue(makeOrder({ dispatchedOn: new Date() }));
-      await expect(service.dispatch(1001, 1)).rejects.toThrow(BadRequestException);
+      mockPrisma.order.findUnique.mockResolvedValue(
+        makeOrder({ dispatchedOn: new Date() }),
+      );
+      await expect(service.dispatch(1001, 1)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('sets dispatchedOn, status=Dispatched, and statusChangedOn', async () => {
       mockPrisma.order.findUnique
         .mockResolvedValueOnce(makeOrder())
-        .mockResolvedValueOnce(makeOrder({ dispatchedOn: new Date(), status: OrderStatus.Dispatched }));
+        .mockResolvedValueOnce(
+          makeOrder({
+            dispatchedOn: new Date(),
+            status: OrderStatus.Dispatched,
+          }),
+        );
       mockPrisma.order.update.mockResolvedValue({});
 
       const result = await service.dispatch(1001, 1);
@@ -466,14 +561,23 @@ describe('OrdersService', () => {
     it('writes a Dispatched history entry', async () => {
       mockPrisma.order.findUnique
         .mockResolvedValueOnce(makeOrder())
-        .mockResolvedValueOnce(makeOrder({ dispatchedOn: new Date(), status: OrderStatus.Dispatched }));
+        .mockResolvedValueOnce(
+          makeOrder({
+            dispatchedOn: new Date(),
+            status: OrderStatus.Dispatched,
+          }),
+        );
       mockPrisma.order.update.mockResolvedValue({});
 
       await service.dispatch(1001, 1);
 
       expect(mockPrisma.orderStatusHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ orderNumber: 1001, status: OrderStatus.Dispatched, changedOn: expect.any(Date) }),
+          data: expect.objectContaining({
+            orderNumber: 1001,
+            status: OrderStatus.Dispatched,
+            changedOn: expect.any(Date),
+          }),
         }),
       );
     });
@@ -485,13 +589,18 @@ describe('OrdersService', () => {
     it('transitions to InProduction when first item is created', async () => {
       const item = makeItem();
       mockPrisma.orderedItem.create.mockResolvedValue({});
-      mockPrisma.orderedItem.findUnique.mockResolvedValue({ ...item, order: makeOrder() });
+      mockPrisma.orderedItem.findUnique.mockResolvedValue({
+        ...item,
+        order: makeOrder(),
+      });
       mockPrisma.$queryRaw.mockResolvedValue([{ counter: 1 }]);
       // findOne for parent check, syncStatus findUnique, syncStatus update, findOne for return
       mockPrisma.order.findUnique
-        .mockResolvedValueOnce(makeOrder())                                        // parent check
-        .mockResolvedValueOnce(makeOrder({ items: [item], status: OrderStatus.Received })) // syncStatus read
-        .mockResolvedValueOnce(makeOrder({ status: OrderStatus.InProduction }));   // findOne after
+        .mockResolvedValueOnce(makeOrder()) // parent check
+        .mockResolvedValueOnce(
+          makeOrder({ items: [item], status: OrderStatus.Received }),
+        ) // syncStatus read
+        .mockResolvedValueOnce(makeOrder({ status: OrderStatus.InProduction })); // findOne after
       mockPrisma.order.update.mockResolvedValue({});
 
       await service.createItem({ parentOrder: 1001 } as any);
@@ -509,12 +618,17 @@ describe('OrdersService', () => {
     it('does not write to DB when status has not changed', async () => {
       const item = makeItem({ checkedOut: false });
       mockPrisma.orderedItem.create.mockResolvedValue({});
-      mockPrisma.orderedItem.findUnique.mockResolvedValue({ ...item, order: makeOrder() });
+      mockPrisma.orderedItem.findUnique.mockResolvedValue({
+        ...item,
+        order: makeOrder(),
+      });
       mockPrisma.$queryRaw.mockResolvedValue([{ counter: 1 }]);
       mockPrisma.order.findUnique
-        .mockResolvedValueOnce(makeOrder())                                                   // parent check
-        .mockResolvedValueOnce(makeOrder({ items: [item], status: OrderStatus.InProduction })) // syncStatus — already correct
-        .mockResolvedValueOnce(makeOrder({ status: OrderStatus.InProduction }));              // findOne for return
+        .mockResolvedValueOnce(makeOrder()) // parent check
+        .mockResolvedValueOnce(
+          makeOrder({ items: [item], status: OrderStatus.InProduction }),
+        ) // syncStatus — already correct
+        .mockResolvedValueOnce(makeOrder({ status: OrderStatus.InProduction })); // findOne for return
       mockPrisma.order.update.mockResolvedValue({});
 
       await service.createItem({ parentOrder: 1001 } as any);
@@ -525,11 +639,20 @@ describe('OrdersService', () => {
     it('transitions to Ready when all items are checked out', async () => {
       const item = makeItem({ checkedOut: false });
       mockPrisma.orderedItem.findUnique
-        .mockResolvedValueOnce({ ...item, order: makeOrder() })  // findItem guard
-        .mockResolvedValueOnce({ ...item, checkedOut: true, order: makeOrder() }); // findItem return
+        .mockResolvedValueOnce({ ...item, order: makeOrder() }) // findItem guard
+        .mockResolvedValueOnce({
+          ...item,
+          checkedOut: true,
+          order: makeOrder(),
+        }); // findItem return
       mockPrisma.orderedItem.update.mockResolvedValue({});
       mockPrisma.order.findUnique
-        .mockResolvedValueOnce(makeOrder({ items: [{ ...item, checkedOut: true }], status: OrderStatus.InProduction })) // syncStatus read
+        .mockResolvedValueOnce(
+          makeOrder({
+            items: [{ ...item, checkedOut: true }],
+            status: OrderStatus.InProduction,
+          }),
+        ) // syncStatus read
         .mockResolvedValueOnce(makeOrder({ status: OrderStatus.Ready })); // findItem's order
       mockPrisma.order.update.mockResolvedValue({});
 
@@ -537,19 +660,34 @@ describe('OrdersService', () => {
 
       expect(mockPrisma.order.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: OrderStatus.Ready, statusChangedOn: expect.any(Date) }),
+          data: expect.objectContaining({
+            status: OrderStatus.Ready,
+            statusChangedOn: expect.any(Date),
+          }),
         }),
       );
     });
 
     it('transitions back to InProduction when a checkout is reversed', async () => {
-      const item = makeItem({ checkedOut: true, checkoutDateStamp: new Date() });
+      const item = makeItem({
+        checkedOut: true,
+        checkoutDateStamp: new Date(),
+      });
       mockPrisma.orderedItem.findUnique
         .mockResolvedValueOnce({ ...item, order: makeOrder() })
-        .mockResolvedValueOnce({ ...item, checkedOut: false, order: makeOrder() });
+        .mockResolvedValueOnce({
+          ...item,
+          checkedOut: false,
+          order: makeOrder(),
+        });
       mockPrisma.orderedItem.update.mockResolvedValue({});
       mockPrisma.order.findUnique
-        .mockResolvedValueOnce(makeOrder({ items: [{ ...item, checkedOut: false }], status: OrderStatus.Ready }))
+        .mockResolvedValueOnce(
+          makeOrder({
+            items: [{ ...item, checkedOut: false }],
+            status: OrderStatus.Ready,
+          }),
+        )
         .mockResolvedValueOnce(makeOrder({ status: OrderStatus.InProduction }));
       mockPrisma.order.update.mockResolvedValue({});
 
@@ -557,7 +695,10 @@ describe('OrdersService', () => {
 
       expect(mockPrisma.order.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: OrderStatus.InProduction, statusChangedOn: expect.any(Date) }),
+          data: expect.objectContaining({
+            status: OrderStatus.InProduction,
+            statusChangedOn: expect.any(Date),
+          }),
         }),
       );
     });
@@ -566,10 +707,19 @@ describe('OrdersService', () => {
       const item = makeItem({ checkedOut: false });
       mockPrisma.orderedItem.findUnique
         .mockResolvedValueOnce({ ...item, order: makeOrder() })
-        .mockResolvedValueOnce({ ...item, checkedOut: true, order: makeOrder() });
+        .mockResolvedValueOnce({
+          ...item,
+          checkedOut: true,
+          order: makeOrder(),
+        });
       mockPrisma.orderedItem.update.mockResolvedValue({});
       mockPrisma.order.findUnique
-        .mockResolvedValueOnce(makeOrder({ items: [{ ...item, checkedOut: true }], status: OrderStatus.InProduction }))
+        .mockResolvedValueOnce(
+          makeOrder({
+            items: [{ ...item, checkedOut: true }],
+            status: OrderStatus.InProduction,
+          }),
+        )
         .mockResolvedValueOnce(makeOrder({ status: OrderStatus.Ready }));
       mockPrisma.order.update.mockResolvedValue({});
 
@@ -577,7 +727,11 @@ describe('OrdersService', () => {
 
       expect(mockPrisma.orderStatusHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ orderNumber: 1001, status: OrderStatus.Ready, changedOn: expect.any(Date) }),
+          data: expect.objectContaining({
+            orderNumber: 1001,
+            status: OrderStatus.Ready,
+            changedOn: expect.any(Date),
+          }),
         }),
       );
     });
@@ -585,11 +739,16 @@ describe('OrdersService', () => {
     it('does not write a history entry when status has not changed', async () => {
       const item = makeItem({ checkedOut: false });
       mockPrisma.orderedItem.create.mockResolvedValue({});
-      mockPrisma.orderedItem.findUnique.mockResolvedValue({ ...item, order: makeOrder() });
+      mockPrisma.orderedItem.findUnique.mockResolvedValue({
+        ...item,
+        order: makeOrder(),
+      });
       mockPrisma.$queryRaw.mockResolvedValue([{ counter: 1 }]);
       mockPrisma.order.findUnique
         .mockResolvedValueOnce(makeOrder())
-        .mockResolvedValueOnce(makeOrder({ items: [item], status: OrderStatus.InProduction }))
+        .mockResolvedValueOnce(
+          makeOrder({ items: [item], status: OrderStatus.InProduction }),
+        )
         .mockResolvedValueOnce(makeOrder({ status: OrderStatus.InProduction }));
 
       await service.createItem({ parentOrder: 1001 } as any);
@@ -607,11 +766,16 @@ describe('OrdersService', () => {
     const arrangeCreateItem = (counter: number) => {
       const item = makeItem();
       mockPrisma.orderedItem.create.mockResolvedValue({});
-      mockPrisma.orderedItem.findUnique.mockResolvedValue({ ...item, order: makeOrder() });
+      mockPrisma.orderedItem.findUnique.mockResolvedValue({
+        ...item,
+        order: makeOrder(),
+      });
       mockPrisma.$queryRaw.mockResolvedValue([{ counter }]);
       mockPrisma.order.findUnique
-        .mockResolvedValueOnce(makeOrder())                                                  // parent check
-        .mockResolvedValueOnce(makeOrder({ items: [item], status: OrderStatus.InProduction })) // syncStatus read (no change)
+        .mockResolvedValueOnce(makeOrder()) // parent check
+        .mockResolvedValueOnce(
+          makeOrder({ items: [item], status: OrderStatus.InProduction }),
+        ) // syncStatus read (no change)
         .mockResolvedValueOnce(makeOrder({ status: OrderStatus.InProduction }));
       mockPrisma.order.update.mockResolvedValue({});
     };
@@ -655,7 +819,9 @@ describe('OrdersService', () => {
       await service.createItem({ parentOrder: 1001 } as any);
 
       const sqlParts = mockPrisma.$queryRaw.mock.calls[0][0] as string[];
-      expect(sqlParts.join('')).toMatch(/RETURNING\s+"Counter"\s+AS\s+counter/i);
+      expect(sqlParts.join('')).toMatch(
+        /RETURNING\s+"Counter"\s+AS\s+counter/i,
+      );
     });
   });
 
@@ -664,12 +830,17 @@ describe('OrdersService', () => {
   describe('findItem', () => {
     it('throws NotFoundException when item does not exist', async () => {
       mockPrisma.orderedItem.findUnique.mockResolvedValue(null);
-      await expect(service.findItem('UNKNOWN')).rejects.toThrow(NotFoundException);
+      await expect(service.findItem('UNKNOWN')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('sets item status=InProduction when not checked out', async () => {
       mockPrisma.orderedItem.findUnique.mockResolvedValue(
-        makeItem({ checkedOut: false, order: makeOrder({ dispatchedOn: null }) }),
+        makeItem({
+          checkedOut: false,
+          order: makeOrder({ dispatchedOn: null }),
+        }),
       );
       const result = await service.findItem('S260010001');
       expect(result.status).toBe(ItemStatus.InProduction);
@@ -677,7 +848,10 @@ describe('OrdersService', () => {
 
     it('sets item status=Ready when checked out and order not dispatched', async () => {
       mockPrisma.orderedItem.findUnique.mockResolvedValue(
-        makeItem({ checkedOut: true, order: makeOrder({ dispatchedOn: null }) }),
+        makeItem({
+          checkedOut: true,
+          order: makeOrder({ dispatchedOn: null }),
+        }),
       );
       const result = await service.findItem('S260010001');
       expect(result.status).toBe(ItemStatus.Ready);
@@ -685,7 +859,10 @@ describe('OrdersService', () => {
 
     it('sets item status=Dispatched when parent order is dispatched', async () => {
       mockPrisma.orderedItem.findUnique.mockResolvedValue(
-        makeItem({ checkedOut: true, order: makeOrder({ dispatchedOn: new Date() }) }),
+        makeItem({
+          checkedOut: true,
+          order: makeOrder({ dispatchedOn: new Date() }),
+        }),
       );
       const result = await service.findItem('S260010001');
       expect(result.status).toBe(ItemStatus.Dispatched);
@@ -698,11 +875,16 @@ describe('OrdersService', () => {
     it('generates a serial number', async () => {
       const item = makeItem();
       mockPrisma.orderedItem.create.mockResolvedValue({});
-      mockPrisma.orderedItem.findUnique.mockResolvedValue({ ...item, order: makeOrder() });
+      mockPrisma.orderedItem.findUnique.mockResolvedValue({
+        ...item,
+        order: makeOrder(),
+      });
       mockPrisma.$queryRaw.mockResolvedValue([{ counter: 1 }]);
       mockPrisma.order.findUnique
         .mockResolvedValueOnce(makeOrder())
-        .mockResolvedValueOnce(makeOrder({ items: [item], status: OrderStatus.InProduction }))
+        .mockResolvedValueOnce(
+          makeOrder({ items: [item], status: OrderStatus.InProduction }),
+        )
         .mockResolvedValueOnce(makeOrder({ status: OrderStatus.InProduction }));
       mockPrisma.order.update.mockResolvedValue({});
 
@@ -718,17 +900,25 @@ describe('OrdersService', () => {
       mockPrisma.orderedItem.findUnique.mockResolvedValue(
         makeItem({ void: true, order: makeOrder() }),
       );
-      await expect(service.updateItem('S260010001', {} as any)).rejects.toThrow(BadRequestException);
+      await expect(service.updateItem('S260010001', {} as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('updates item and returns the updated record', async () => {
       const item = makeItem();
       mockPrisma.orderedItem.findUnique
         .mockResolvedValueOnce({ ...item, order: makeOrder() })
-        .mockResolvedValueOnce({ ...item, description: 'Updated', order: makeOrder() });
+        .mockResolvedValueOnce({
+          ...item,
+          description: 'Updated',
+          order: makeOrder(),
+        });
       mockPrisma.orderedItem.update.mockResolvedValue({});
 
-      const result = await service.updateItem('S260010001', { description: 'Updated' } as any);
+      const result = await service.updateItem('S260010001', {
+        description: 'Updated',
+      } as any);
       expect(result.description).toBe('Updated');
     });
   });
@@ -740,7 +930,9 @@ describe('OrdersService', () => {
       mockPrisma.orderedItem.findUnique.mockResolvedValue(
         makeItem({ void: true, order: makeOrder() }),
       );
-      await expect(service.voidItem('S260010001')).rejects.toThrow(BadRequestException);
+      await expect(service.voidItem('S260010001')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('sets void=true, voidDateStamp, voidedBy, and syncs status', async () => {
@@ -750,7 +942,9 @@ describe('OrdersService', () => {
         .mockResolvedValueOnce({ ...item, void: true, order: makeOrder() });
       mockPrisma.orderedItem.update.mockResolvedValue({});
       mockPrisma.order.findUnique
-        .mockResolvedValueOnce(makeOrder({ items: [], status: OrderStatus.InProduction }))
+        .mockResolvedValueOnce(
+          makeOrder({ items: [], status: OrderStatus.InProduction }),
+        )
         .mockResolvedValueOnce(makeOrder({ status: OrderStatus.Received }));
       mockPrisma.order.update.mockResolvedValue({});
 
@@ -758,7 +952,11 @@ describe('OrdersService', () => {
 
       expect(mockPrisma.orderedItem.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ void: true, voidDateStamp: expect.any(Date), voidedBy: 'jsmith' }),
+          data: expect.objectContaining({
+            void: true,
+            voidDateStamp: expect.any(Date),
+            voidedBy: 'jsmith',
+          }),
         }),
       );
     });
@@ -768,23 +966,40 @@ describe('OrdersService', () => {
 
   describe('checkoutItem', () => {
     it('throws BadRequestException when item is voided', async () => {
-      mockPrisma.orderedItem.findUnique.mockResolvedValue(makeItem({ void: true, order: makeOrder() }));
-      await expect(service.checkoutItem('S260010001')).rejects.toThrow(BadRequestException);
+      mockPrisma.orderedItem.findUnique.mockResolvedValue(
+        makeItem({ void: true, order: makeOrder() }),
+      );
+      await expect(service.checkoutItem('S260010001')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when item is already checked out', async () => {
-      mockPrisma.orderedItem.findUnique.mockResolvedValue(makeItem({ checkedOut: true, order: makeOrder() }));
-      await expect(service.checkoutItem('S260010001')).rejects.toThrow(BadRequestException);
+      mockPrisma.orderedItem.findUnique.mockResolvedValue(
+        makeItem({ checkedOut: true, order: makeOrder() }),
+      );
+      await expect(service.checkoutItem('S260010001')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('sets checkedOut=true and checkoutDateStamp', async () => {
       const item = makeItem();
       mockPrisma.orderedItem.findUnique
         .mockResolvedValueOnce({ ...item, order: makeOrder() })
-        .mockResolvedValueOnce({ ...item, checkedOut: true, order: makeOrder() });
+        .mockResolvedValueOnce({
+          ...item,
+          checkedOut: true,
+          order: makeOrder(),
+        });
       mockPrisma.orderedItem.update.mockResolvedValue({});
       mockPrisma.order.findUnique
-        .mockResolvedValueOnce(makeOrder({ items: [{ ...item, checkedOut: true }], status: OrderStatus.InProduction }))
+        .mockResolvedValueOnce(
+          makeOrder({
+            items: [{ ...item, checkedOut: true }],
+            status: OrderStatus.InProduction,
+          }),
+        )
         .mockResolvedValueOnce(makeOrder({ status: OrderStatus.Ready }));
       mockPrisma.order.update.mockResolvedValue({});
 
@@ -792,7 +1007,10 @@ describe('OrdersService', () => {
 
       expect(mockPrisma.orderedItem.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ checkedOut: true, checkoutDateStamp: expect.any(Date) }),
+          data: expect.objectContaining({
+            checkedOut: true,
+            checkoutDateStamp: expect.any(Date),
+          }),
         }),
       );
     });
@@ -802,23 +1020,44 @@ describe('OrdersService', () => {
 
   describe('uncheckedOutItem', () => {
     it('throws BadRequestException when item is voided', async () => {
-      mockPrisma.orderedItem.findUnique.mockResolvedValue(makeItem({ void: true, order: makeOrder() }));
-      await expect(service.uncheckedOutItem('S260010001')).rejects.toThrow(BadRequestException);
+      mockPrisma.orderedItem.findUnique.mockResolvedValue(
+        makeItem({ void: true, order: makeOrder() }),
+      );
+      await expect(service.uncheckedOutItem('S260010001')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when item is not checked out', async () => {
-      mockPrisma.orderedItem.findUnique.mockResolvedValue(makeItem({ checkedOut: false, order: makeOrder() }));
-      await expect(service.uncheckedOutItem('S260010001')).rejects.toThrow(BadRequestException);
+      mockPrisma.orderedItem.findUnique.mockResolvedValue(
+        makeItem({ checkedOut: false, order: makeOrder() }),
+      );
+      await expect(service.uncheckedOutItem('S260010001')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('sets checkedOut=false and clears checkoutDateStamp', async () => {
-      const item = makeItem({ checkedOut: true, checkoutDateStamp: new Date() });
+      const item = makeItem({
+        checkedOut: true,
+        checkoutDateStamp: new Date(),
+      });
       mockPrisma.orderedItem.findUnique
         .mockResolvedValueOnce({ ...item, order: makeOrder() })
-        .mockResolvedValueOnce({ ...item, checkedOut: false, checkoutDateStamp: null, order: makeOrder() });
+        .mockResolvedValueOnce({
+          ...item,
+          checkedOut: false,
+          checkoutDateStamp: null,
+          order: makeOrder(),
+        });
       mockPrisma.orderedItem.update.mockResolvedValue({});
       mockPrisma.order.findUnique
-        .mockResolvedValueOnce(makeOrder({ items: [{ ...item, checkedOut: false }], status: OrderStatus.Ready }))
+        .mockResolvedValueOnce(
+          makeOrder({
+            items: [{ ...item, checkedOut: false }],
+            status: OrderStatus.Ready,
+          }),
+        )
         .mockResolvedValueOnce(makeOrder({ status: OrderStatus.InProduction }));
       mockPrisma.order.update.mockResolvedValue({});
 
@@ -826,7 +1065,10 @@ describe('OrdersService', () => {
 
       expect(mockPrisma.orderedItem.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ checkedOut: false, checkoutDateStamp: null }),
+          data: expect.objectContaining({
+            checkedOut: false,
+            checkoutDateStamp: null,
+          }),
         }),
       );
     });

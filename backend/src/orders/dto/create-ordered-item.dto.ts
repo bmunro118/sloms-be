@@ -7,7 +7,7 @@ import {
   IsInt,
   MaxLength,
   Min,
-} from "class-validator";
+} from 'class-validator';
 
 export class CreateOrderedItemDto {
   @IsOptional()

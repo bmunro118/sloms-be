@@ -7,7 +7,11 @@ import { User } from '../../users/entities/user.entity';
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly authService: AuthService) {
-    super({ usernameField: 'username', passwordField: 'password', passReqToCallback: true });
+    super({
+      usernameField: 'username',
+      passwordField: 'password',
+      passReqToCallback: true,
+    });
   }
 
   /**

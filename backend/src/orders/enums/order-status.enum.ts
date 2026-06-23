@@ -1,7 +1,7 @@
 export enum OrderStatus {
-  Received     = 'Received',
+  Received = 'Received',
   InProduction = 'InProduction',
-  Ready        = 'Ready',
-  Dispatched   = 'Dispatched',
-  Voided       = 'Voided',
+  Ready = 'Ready',
+  Dispatched = 'Dispatched',
+  Voided = 'Voided',
 }

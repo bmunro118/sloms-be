@@ -3,20 +3,20 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   CsvImportResult,
   PriceListItem,
   PriceListRevision,
   PriceListRow,
   PriceListType,
-} from "./entities/price-list.entity";
-import { parse } from "csv-parse/sync";
-import { stringify } from "csv-stringify/sync";
+} from './entities/price-list.entity';
+import { parse } from 'csv-parse/sync';
+import { stringify } from 'csv-stringify/sync';
 
 function normaliseItemId(raw: string): string {
-  return raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
 @Injectable()
@@ -29,10 +29,10 @@ export class PriceListService {
 
   private async getActiveRevision(): Promise<PriceListRevision> {
     const revision = await this.prisma.priceListRevision.findFirst({
-      where: { status: "active" },
+      where: { status: 'active' },
     });
     if (!revision) {
-      throw new NotFoundException("No active price list revision found");
+      throw new NotFoundException('No active price list revision found');
     }
     return revision as PriceListRevision;
   }
@@ -40,7 +40,7 @@ export class PriceListService {
   private async getActiveListTypes(): Promise<PriceListType[]> {
     return this.prisma.priceListType.findMany({
       where: { isActive: true, void: false },
-      orderBy: { sortOrder: "asc" },
+      orderBy: { sortOrder: 'asc' },
     }) as Promise<PriceListType[]>;
   }
 
@@ -71,7 +71,7 @@ export class PriceListService {
 
   async listRevisions(): Promise<PriceListRevision[]> {
     return this.prisma.priceListRevision.findMany({
-      orderBy: { importedAt: "desc" },
+      orderBy: { importedAt: 'desc' },
     }) as Promise<PriceListRevision[]>;
   }
 
@@ -88,20 +88,20 @@ export class PriceListService {
   async activateRevision(id: number): Promise<PriceListRevision> {
     const target = await this.getRevision(id);
 
-    if (target.status === "active") {
+    if (target.status === 'active') {
       throw new ConflictException(`Revision ${id} is already active`);
     }
 
     return this.prisma.$transaction(async (tx) => {
       // Archive the currently active revision if there is one
       await tx.priceListRevision.updateMany({
-        where: { status: "active" },
-        data: { status: "archived" },
+        where: { status: 'active' },
+        data: { status: 'archived' },
       });
 
       const activated = await tx.priceListRevision.update({
         where: { id },
-        data: { status: "active", activatedAt: new Date() },
+        data: { status: 'active', activatedAt: new Date() },
       });
 
       return activated as PriceListRevision;
@@ -120,7 +120,7 @@ export class PriceListService {
     const [items, listTypes] = await Promise.all([
       this.prisma.priceListItem.findMany({
         where: { void: false },
-        orderBy: [{ category: "asc" }, { itemId: "asc" }],
+        orderBy: [{ category: 'asc' }, { itemId: 'asc' }],
         include: {
           prices: { where: { revisionId: revision.id } },
         },
@@ -142,7 +142,7 @@ export class PriceListService {
     const [items, listTypes] = await Promise.all([
       this.prisma.priceListItem.findMany({
         where: { category, void: false },
-        orderBy: { itemId: "asc" },
+        orderBy: { itemId: 'asc' },
         include: {
           prices: { where: { revisionId: revision.id } },
         },
@@ -176,13 +176,20 @@ export class PriceListService {
     return row;
   }
 
-  async voidItem(itemId: string, voidedBy: string | null = null): Promise<PriceListItem> {
-    const item = await this.prisma.priceListItem.findUnique({ where: { itemId } });
+  async voidItem(
+    itemId: string,
+    voidedBy: string | null = null,
+  ): Promise<PriceListItem> {
+    const item = await this.prisma.priceListItem.findUnique({
+      where: { itemId },
+    });
     if (!item) {
       throw new NotFoundException(`Price list item '${itemId}' not found`);
     }
     if (item.void) {
-      throw new BadRequestException(`Price list item '${itemId}' is already voided`);
+      throw new BadRequestException(
+        `Price list item '${itemId}' is already voided`,
+      );
     }
     return this.prisma.priceListItem.update({
       where: { itemId },
@@ -190,8 +197,13 @@ export class PriceListService {
     }) as Promise<PriceListItem>;
   }
 
-  async voidListType(id: number, voidedBy: string | null = null): Promise<PriceListType> {
-    const listType = await this.prisma.priceListType.findUnique({ where: { id } });
+  async voidListType(
+    id: number,
+    voidedBy: string | null = null,
+  ): Promise<PriceListType> {
+    const listType = await this.prisma.priceListType.findUnique({
+      where: { id },
+    });
     if (!listType) {
       throw new NotFoundException(`Price list type ${id} not found`);
     }
@@ -226,12 +238,12 @@ export class PriceListService {
     if (!listType || listType.void) {
       const all = await this.prisma.priceListType.findMany({
         where: { isActive: true, void: false },
-        orderBy: { sortOrder: "asc" },
+        orderBy: { sortOrder: 'asc' },
         select: { name: true },
       });
       throw new NotFoundException(
         `Price list '${listName}' not found. ` +
-          `Valid lists are: ${all.map((l) => l.name).join(", ")}`,
+          `Valid lists are: ${all.map((l) => l.name).join(', ')}`,
       );
     }
 
@@ -300,7 +312,7 @@ export class PriceListService {
 
     const [items, listTypes] = await Promise.all([
       this.prisma.priceListItem.findMany({
-        orderBy: [{ category: "asc" }, { itemId: "asc" }],
+        orderBy: [{ category: 'asc' }, { itemId: 'asc' }],
         include: {
           prices: { where: { revisionId: revision.id } },
         },
@@ -314,19 +326,19 @@ export class PriceListService {
     const records = rows.map((row) => {
       const record: Record<string, string> = {
         ItemID: row.itemId,
-        Category: row.category ?? "",
-        Description: row.description ?? "",
+        Category: row.category ?? '',
+        Description: row.description ?? '',
       };
       for (const name of listNames) {
         const val = row.prices[name];
-        record[name] = val != null ? String(val) : "";
+        record[name] = val != null ? String(val) : '';
       }
       return record;
     });
 
     return stringify(records, {
       header: true,
-      columns: ["ItemID", "Category", "Description", ...listNames],
+      columns: ['ItemID', 'Category', 'Description', ...listNames],
     });
   }
 
@@ -350,33 +362,33 @@ export class PriceListService {
         trim: true,
       }) as Record<string, string>[];
     } catch {
-      throw new BadRequestException("Failed to parse CSV file");
+      throw new BadRequestException('Failed to parse CSV file');
     }
 
     if (records.length === 0) {
-      throw new BadRequestException("CSV file contains no data rows");
+      throw new BadRequestException('CSV file contains no data rows');
     }
 
     const headers = Object.keys(records[0]);
-    const metaCols = new Set(["ItemID", "Category", "Description"]);
+    const metaCols = new Set(['ItemID', 'Category', 'Description']);
     const listNames = headers.filter((h) => !metaCols.has(h));
 
-    if (!headers.includes("ItemID")) {
+    if (!headers.includes('ItemID')) {
       throw new BadRequestException("CSV must contain an 'ItemID' column");
     }
 
     // Block on duplicate ItemIDs within the CSV
     // Normalise all ItemIDs in-place before any further processing
     for (const record of records) {
-      if (record["ItemID"] != null) {
-        record["ItemID"] = normaliseItemId(record["ItemID"]);
+      if (record['ItemID'] != null) {
+        record['ItemID'] = normaliseItemId(record['ItemID']);
       }
     }
 
     const seenIds = new Set<string>();
     const duplicateIds = new Set<string>();
     for (const record of records) {
-      const itemId = record["ItemID"];
+      const itemId = record['ItemID'];
       if (!itemId) continue;
       if (seenIds.has(itemId)) {
         duplicateIds.add(itemId);
@@ -385,32 +397,37 @@ export class PriceListService {
     }
     if (duplicateIds.size > 0) {
       throw new BadRequestException(
-        `CSV contains duplicate ItemIDs: ${[...duplicateIds].join(", ")}`,
+        `CSV contains duplicate ItemIDs: ${[...duplicateIds].join(', ')}`,
       );
     }
 
     // Fetch the active revision once — needed for merge, new-list detection, and warnings
     const activeRevision = await this.prisma.priceListRevision.findFirst({
-      where: { status: "active" },
+      where: { status: 'active' },
       select: { id: true },
     });
 
     if (merge && !activeRevision) {
       throw new BadRequestException(
-        "Merge requires an active revision to exist — no active revision found",
+        'Merge requires an active revision to exist — no active revision found',
       );
     }
 
     // Active revision list names (used for new-list detection and merge)
-    let activeListNames = new Set<string>();
+    const activeListNames = new Set<string>();
     // Active prices as a map keyed by "itemId:listId" → price (used for merge)
     type PriceEntry = { itemId: string; listId: number; price: number | null };
-    let activePriceMap = new Map<string, PriceEntry>();
+    const activePriceMap = new Map<string, PriceEntry>();
 
     if (activeRevision) {
       const activePrices = await this.prisma.itemPrice.findMany({
         where: { revisionId: activeRevision.id },
-        select: { itemId: true, listId: true, price: true, list: { select: { name: true } } },
+        select: {
+          itemId: true,
+          listId: true,
+          price: true,
+          list: { select: { name: true } },
+        },
       });
       for (const p of activePrices) {
         activeListNames.add(p.list.name);
@@ -432,7 +449,7 @@ export class PriceListService {
     const activeBands = await this.prisma.customer.findMany({
       where: { suspended: false, band: { not: null } },
       select: { band: true },
-      distinct: ["band"],
+      distinct: ['band'],
     });
     const warnings: string[] = activeBands
       .map((c) => c.band as string)
@@ -455,12 +472,14 @@ export class PriceListService {
 
     // Compute per-item breakdown against the active revision
     const activeItemIds = new Set(
-      [...activePriceMap.keys()].map((k) => k.split(":")[0]),
+      [...activePriceMap.keys()].map((k) => k.split(':')[0]),
     );
-    const csvItemIds = records.map((r) => r["ItemID"]).filter(Boolean);
+    const csvItemIds = records.map((r) => r['ItemID']).filter(Boolean);
     const csvItemCount = csvItemIds.length;
     const itemsAdded = csvItemIds.filter((id) => !activeItemIds.has(id)).length;
-    const itemsUpdated = csvItemIds.filter((id) => activeItemIds.has(id)).length;
+    const itemsUpdated = csvItemIds.filter((id) =>
+      activeItemIds.has(id),
+    ).length;
 
     // Merge-specific counts (null in replace mode)
     const activeUniqueItemIds = new Set(activeItemIds);
@@ -499,7 +518,12 @@ export class PriceListService {
       let nextSort = (maxSort._max.sortOrder ?? 0) + 1;
       for (const name of newListNames) {
         await this.prisma.priceListType.create({
-          data: { name, displayName: name, sortOrder: nextSort++, createdBy: importedBy },
+          data: {
+            name,
+            displayName: name,
+            sortOrder: nextSort++,
+            createdBy: importedBy,
+          },
         });
       }
     }
@@ -512,15 +536,15 @@ export class PriceListService {
 
     // Create a new draft revision
     const revision = await this.prisma.priceListRevision.create({
-      data: { name: revisionName, status: "draft", notes, importedBy },
+      data: { name: revisionName, status: 'draft', notes, importedBy },
     });
 
     // Upsert PriceListItem rows for every item in the CSV
     await Promise.all(
       records.map((record) => {
-        const itemId = record["ItemID"];
-        const category = record["Category"]?.trim() || null;
-        const description = record["Description"]?.trim() || null;
+        const itemId = record['ItemID'];
+        const category = record['Category']?.trim() || null;
+        const description = record['Description']?.trim() || null;
         return this.prisma.priceListItem.upsert({
           where: { itemId },
           create: { itemId, category, description, createdBy: importedBy },
@@ -532,7 +556,10 @@ export class PriceListService {
     // Build the price data for the new revision.
     // In merge mode: start from the active revision's prices, then overlay the CSV.
     // In replace mode: use only the CSV prices.
-    const priceMap = new Map<string, { itemId: string; listId: number; price: number | null }>();
+    const priceMap = new Map<
+      string,
+      { itemId: string; listId: number; price: number | null }
+    >();
 
     if (merge) {
       for (const [key, entry] of activePriceMap) {
@@ -541,19 +568,26 @@ export class PriceListService {
     }
 
     for (const record of records) {
-      const itemId = record["ItemID"];
+      const itemId = record['ItemID'];
       if (!itemId) continue;
       for (const name of listNames) {
         const listType = typeByName.get(name);
         if (!listType) continue;
         const raw = record[name]?.trim();
         const price = raw ? parseFloat(raw) : null;
-        priceMap.set(`${itemId}:${listType.id}`, { itemId, listId: listType.id, price });
+        priceMap.set(`${itemId}:${listType.id}`, {
+          itemId,
+          listId: listType.id,
+          price,
+        });
       }
     }
 
     await this.prisma.itemPrice.createMany({
-      data: [...priceMap.values()].map((p) => ({ ...p, revisionId: revision.id })),
+      data: [...priceMap.values()].map((p) => ({
+        ...p,
+        revisionId: revision.id,
+      })),
     });
 
     return {

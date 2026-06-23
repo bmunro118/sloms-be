@@ -1,8 +1,8 @@
-import type { Customer } from "../../customers/entities/customer.entity";
-import type { CustomerAddress } from "../../customers/entities/customer-address.entity";
-import type { OrderedItem } from "./ordered-item.entity";
-import type { VatRate } from "../../vat-rates/entities/vat-rate.entity";
-import { OrderStatus } from "../enums/order-status.enum";
+import type { Customer } from '../../customers/entities/customer.entity';
+import type { CustomerAddress } from '../../customers/entities/customer-address.entity';
+import type { OrderedItem } from './ordered-item.entity';
+import type { VatRate } from '../../vat-rates/entities/vat-rate.entity';
+import { OrderStatus } from '../enums/order-status.enum';
 
 export interface OrderStatusHistoryEntry {
   id: number;

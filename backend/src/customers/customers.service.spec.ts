@@ -132,7 +132,9 @@ describe('CustomersService', () => {
   describe('update', () => {
     it('throws NotFoundException when customer does not exist', async () => {
       mockPrisma.customer.findUnique.mockResolvedValue(null);
-      await expect(service.update(99, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(service.update(99, {} as any)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('updates and returns the customer', async () => {
@@ -140,7 +142,9 @@ describe('CustomersService', () => {
       mockPrisma.customer.findUnique.mockResolvedValue(customer);
       mockPrisma.customer.update.mockResolvedValue(customer);
 
-      const result = await service.update(1, { companyName: 'New Name' } as any);
+      const result = await service.update(1, {
+        companyName: 'New Name',
+      } as any);
       expect(result.companyName).toBe('New Name');
     });
   });
@@ -155,10 +159,13 @@ describe('CustomersService', () => {
 
     it('sets suspended=true and suspendedOn', async () => {
       const customer = makeCustomer();
-      const suspended = makeCustomer({ suspended: true, suspendedOn: new Date() });
+      const suspended = makeCustomer({
+        suspended: true,
+        suspendedOn: new Date(),
+      });
       mockPrisma.customer.findUnique
-        .mockResolvedValueOnce(customer)    // findOne check
-        .mockResolvedValueOnce(suspended);  // findOne after update
+        .mockResolvedValueOnce(customer) // findOne check
+        .mockResolvedValueOnce(suspended); // findOne after update
       mockPrisma.customer.update.mockResolvedValue(suspended);
 
       const result = await service.suspend(1);
@@ -185,7 +192,9 @@ describe('CustomersService', () => {
   describe('findAllAddresses', () => {
     it('throws NotFoundException when customer does not exist', async () => {
       mockPrisma.customer.findUnique.mockResolvedValue(null);
-      await expect(service.findAllAddresses(99)).rejects.toThrow(NotFoundException);
+      await expect(service.findAllAddresses(99)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('only returns non-voided addresses', async () => {
@@ -196,7 +205,9 @@ describe('CustomersService', () => {
       await service.findAllAddresses(1);
 
       expect(mockPrisma.customerAddress.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ void: false }) }),
+        expect.objectContaining({
+          where: expect.objectContaining({ void: false }),
+        }),
       );
     });
 
@@ -215,7 +226,9 @@ describe('CustomersService', () => {
       mockPrisma.customer.findUnique.mockResolvedValue(makeCustomer());
       mockPrisma.customerAddress.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOneAddress(1, 99)).rejects.toThrow(NotFoundException);
+      await expect(service.findOneAddress(1, 99)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('returns the address', async () => {
@@ -231,7 +244,9 @@ describe('CustomersService', () => {
     it('clears existing default when creating a new default address', async () => {
       mockPrisma.customer.findUnique.mockResolvedValue(makeCustomer());
       mockPrisma.customerAddress.updateMany.mockResolvedValue({});
-      mockPrisma.customerAddress.create.mockResolvedValue(makeAddress({ defaultAddress: true }));
+      mockPrisma.customerAddress.create.mockResolvedValue(
+        makeAddress({ defaultAddress: true }),
+      );
 
       await service.createAddress(1, { defaultAddress: true } as any);
 
@@ -255,9 +270,11 @@ describe('CustomersService', () => {
       mockPrisma.customer.findUnique.mockResolvedValue(makeCustomer());
       const address = makeAddress();
       mockPrisma.customerAddress.findFirst
-        .mockResolvedValueOnce(address)  // findOneAddress before update
+        .mockResolvedValueOnce(address) // findOneAddress before update
         .mockResolvedValueOnce(makeAddress({ void: true })); // findOneAddress after
-      mockPrisma.customerAddress.update.mockResolvedValue(makeAddress({ void: true }));
+      mockPrisma.customerAddress.update.mockResolvedValue(
+        makeAddress({ void: true }),
+      );
 
       await service.removeAddress(1, 1);
 
@@ -273,7 +290,7 @@ describe('CustomersService', () => {
       mockPrisma.customerAddress.updateMany.mockResolvedValue({});
       const address = makeAddress({ defaultAddress: false });
       mockPrisma.customerAddress.findFirst
-        .mockResolvedValueOnce(address)   // findOneAddress validation
+        .mockResolvedValueOnce(address) // findOneAddress validation
         .mockResolvedValueOnce(makeAddress({ defaultAddress: true })); // return after update
       mockPrisma.customerAddress.update.mockResolvedValue({});
 

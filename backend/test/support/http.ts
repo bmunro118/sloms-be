@@ -1,8 +1,8 @@
-import { INestApplication } from "@nestjs/common";
-import * as request from "supertest";
-import { recordHit } from "./coverage";
+import { INestApplication } from '@nestjs/common';
+import * as request from 'supertest';
+import { recordHit } from './coverage';
 
-type Method = "get" | "post" | "put" | "patch" | "delete";
+type Method = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
 /**
  * supertest wrapped so every call records the route it hits for the
@@ -21,13 +21,15 @@ export function api(app: INestApplication) {
       return request(server)[method](path);
     };
   return {
-    get: wrap("get"),
-    post: wrap("post"),
-    put: wrap("put"),
-    patch: wrap("patch"),
-    delete: wrap("delete"),
+    get: wrap('get'),
+    post: wrap('post'),
+    put: wrap('put'),
+    patch: wrap('patch'),
+    delete: wrap('delete'),
   };
 }
 
 /** Bearer auth header helper. */
-export const authHeader = (token: string) => ({ Authorization: `Bearer ${token}` });
+export const authHeader = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+});

@@ -72,9 +72,15 @@ export function renderOrderBreakdownHtml(data: OrderBreakdownData): string {
     )
     .join('');
 
-  const invoiceAddressLines = data.invoiceAddress.map((l) => `<div>${esc(l)}</div>`).join('');
-  const deliveryAddressLines = data.deliveryAddress.map((l) => `<div>${esc(l)}</div>`).join('');
-  const companyAddressLines = data.company.addressLines.map((l) => `<div>${esc(l)}</div>`).join('');
+  const invoiceAddressLines = data.invoiceAddress
+    .map((l) => `<div>${esc(l)}</div>`)
+    .join('');
+  const deliveryAddressLines = data.deliveryAddress
+    .map((l) => `<div>${esc(l)}</div>`)
+    .join('');
+  const companyAddressLines = data.company.addressLines
+    .map((l) => `<div>${esc(l)}</div>`)
+    .join('');
 
   return `<!DOCTYPE html>
 <html lang="en">

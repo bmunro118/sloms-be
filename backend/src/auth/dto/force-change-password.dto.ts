@@ -1,5 +1,12 @@
-import { IsString, IsNotEmpty, MinLength, MaxLength, IsOptional, IsIn } from "class-validator";
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsString,
+  IsNotEmpty,
+  MinLength,
+  MaxLength,
+  IsOptional,
+  IsIn,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ForceChangePasswordDto {
   @ApiProperty({ minLength: 8, maxLength: 100 })

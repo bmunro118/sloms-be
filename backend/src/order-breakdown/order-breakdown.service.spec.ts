@@ -29,14 +29,13 @@ jest.mock('playwright', () => {
 });
 
 // Retrieve the mock objects after the module has been registered
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
 const playwrightMock = require('playwright') as {
   chromium: { launch: jest.Mock };
   __mockPage: { setContent: jest.Mock; pdf: jest.Mock; close: jest.Mock };
   __mockBrowser: { newPage: jest.Mock; close: jest.Mock };
 };
 const mockPage = playwrightMock.__mockPage;
-const mockBrowser = playwrightMock.__mockBrowser;
 
 // ---------------------------------------------------------------------------
 // Mock Prisma
@@ -178,9 +177,9 @@ describe('OrderBreakdownService', () => {
       await service.generateOrderBreakdown(1001, 1);
 
       const [html] = mockPage.setContent.mock.calls[0];
-      expect(html).toContain('SLI001001');       // formatted order number
-      expect(html).toContain('Acme Hearing');    // customer name
-      expect(html).toContain('S260010001');      // serial number
+      expect(html).toContain('SLI001001'); // formatted order number
+      expect(html).toContain('Acme Hearing'); // customer name
+      expect(html).toContain('S260010001'); // serial number
     });
 
     it('uses customer companyName as account when customer relation is present', async () => {
@@ -288,7 +287,12 @@ describe('OrderBreakdownService', () => {
       const order = makeOrder({
         items: [
           { ...makeOrder().items[0], price: 100, void: false },
-          { ...makeOrder().items[0], serialNumber: 'S260010002', price: 50, void: false },
+          {
+            ...makeOrder().items[0],
+            serialNumber: 'S260010002',
+            price: 50,
+            void: false,
+          },
         ],
         vatRate: { rate: 20 },
       });
@@ -337,7 +341,13 @@ describe('OrderBreakdownService', () => {
 
     it('renders nothing for patient when both surname and initial are null', async () => {
       const order = makeOrder({
-        items: [{ ...makeOrder().items[0], patientSurname: null, patientInitial: null }],
+        items: [
+          {
+            ...makeOrder().items[0],
+            patientSurname: null,
+            patientInitial: null,
+          },
+        ],
       });
       mockPrisma.order.findUnique.mockResolvedValue(order);
 

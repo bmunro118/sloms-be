@@ -1,6 +1,6 @@
-import { createTestApp } from "./support/app";
-import { buildOperations, isCovered, Operation } from "./support/openapi";
-import { loadHits } from "./support/coverage";
+import { createTestApp } from './support/app';
+import { buildOperations, isCovered, Operation } from './support/openapi';
+import { loadHits } from './support/coverage';
 
 /**
  * Endpoint-coverage guard.
@@ -14,7 +14,7 @@ import { loadHits } from "./support/coverage";
  * REPORTS gaps so a single-file run (`jest customers`) doesn't fail spuriously.
  * Set COVERAGE_GUARD=1 (CI does) to turn the gap into a hard failure.
  */
-describe("API endpoint coverage", () => {
+describe('API endpoint coverage', () => {
   let operations: Operation[];
   let uncovered: Operation[];
 
@@ -29,14 +29,14 @@ describe("API endpoint coverage", () => {
     uncovered = operations.filter((op) => !isCovered(op, hits));
   });
 
-  it("discovers the documented endpoint surface", () => {
+  it('discovers the documented endpoint surface', () => {
     expect(operations.length).toBeGreaterThan(0);
   });
 
-  const enforced = process.env.COVERAGE_GUARD === "1";
+  const enforced = process.env.COVERAGE_GUARD === '1';
 
   (enforced ? it : it.skip)(
-    "exercises every documented endpoint at least once",
+    'exercises every documented endpoint at least once',
     () => {
       const missing = uncovered.map(
         (op) => `${op.method.toUpperCase()} ${op.template}`,
@@ -45,7 +45,7 @@ describe("API endpoint coverage", () => {
     },
   );
 
-  it("prints a coverage summary", () => {
+  it('prints a coverage summary', () => {
     const total = operations.length;
     const covered = total - uncovered.length;
     // eslint-disable-next-line no-console
@@ -55,10 +55,10 @@ describe("API endpoint coverage", () => {
           ? `\nUncovered:\n` +
             uncovered
               .map((op) => `  - ${op.method.toUpperCase()} ${op.template}`)
-              .join("\n") +
-            (enforced ? "" : "\n(set COVERAGE_GUARD=1 to fail on gaps)")
-          : " — full coverage 🎉") +
-        "\n",
+              .join('\n') +
+            (enforced ? '' : '\n(set COVERAGE_GUARD=1 to fail on gaps)')
+          : ' — full coverage 🎉') +
+        '\n',
     );
     expect(covered).toBeLessThanOrEqual(total);
   });

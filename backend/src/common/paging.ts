@@ -1,12 +1,12 @@
-import { IsInt, IsOptional, Min, Max } from "class-validator";
-import { Type } from "class-transformer";
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import { IsInt, IsOptional, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 // ─── Query DTO ────────────────────────────────────────────────────────────────
 
 export class PagingDto {
   @ApiPropertyOptional({
-    description: "Page number (1-based)",
+    description: 'Page number (1-based)',
     default: 1,
     minimum: 1,
   })
@@ -17,7 +17,7 @@ export class PagingDto {
   page?: number = 1;
 
   @ApiPropertyOptional({
-    description: "Number of records per page",
+    description: 'Number of records per page',
     default: 25,
     minimum: 1,
     maximum: 100,

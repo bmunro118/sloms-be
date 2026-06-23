@@ -1,4 +1,4 @@
-import { PrismaService } from "../../src/prisma/prisma.service";
+import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
  * Test-data conventions
@@ -13,7 +13,7 @@ import { PrismaService } from "../../src/prisma/prisma.service";
  * `cleanupE2E()` removes everything matching those tags and is safe to call in
  * both beforeAll and afterAll.
  */
-export const E2E_MARKER = "__E2E__";
+export const E2E_MARKER = '__E2E__';
 
 /** Reserved order-number namespace — well above any seeded/migrated order. */
 export const ORDER_NS = 990000;
@@ -36,7 +36,7 @@ export async function createTestCustomer(
   const customer = await prisma.customer.create({
     data: {
       companyName: `${E2E_MARKER} Test Customer`,
-      band: "Dispensary",
+      band: 'Dispensary',
       suspended: false,
       ...overrides,
     },

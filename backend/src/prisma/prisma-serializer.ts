@@ -1,9 +1,9 @@
 function isDecimalLike(value: unknown): value is { toNumber(): number } {
   return (
-    typeof value === "object" &&
+    typeof value === 'object' &&
     value !== null &&
-    typeof (value as { toNumber?: unknown }).toNumber === "function" &&
-    value.constructor?.name === "Decimal"
+    typeof (value as { toNumber?: unknown }).toNumber === 'function' &&
+    value.constructor?.name === 'Decimal'
   );
 }
 
@@ -16,7 +16,7 @@ export function serializePrisma<T>(value: unknown): T {
     return value.toNumber() as T;
   }
 
-  if (value instanceof Date || value === null || typeof value !== "object") {
+  if (value instanceof Date || value === null || typeof value !== 'object') {
     return value as T;
   }
 

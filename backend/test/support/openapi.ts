@@ -1,7 +1,7 @@
-import { INestApplication } from "@nestjs/common";
-import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { INestApplication } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-const METHODS = ["get", "post", "put", "patch", "delete"] as const;
+const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
 export interface Operation {
   method: string;
@@ -23,9 +23,9 @@ export interface Operation {
  */
 export function buildOperations(app: INestApplication): Operation[] {
   const config = new DocumentBuilder()
-    .setTitle("SLOMS API")
-    .setVersion("1.0")
-    .addBearerAuth({ type: "http", scheme: "bearer" }, "access-token")
+    .setTitle('SLOMS API')
+    .setVersion('1.0')
+    .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'access-token')
     .build();
   const doc = SwaggerModule.createDocument(app, config);
 
@@ -53,14 +53,14 @@ export function buildOperations(app: INestApplication): Operation[] {
  * to BOTH the template and the recorded hit before comparing.
  */
 export function stripApiPrefix(path: string): string {
-  return path.replace(/^\/api(?=\/|$)/, "") || "/";
+  return path.replace(/^\/api(?=\/|$)/, '') || '/';
 }
 
 /** Turn an OpenAPI path template into an anchored regex for raw-path matching. */
 export function templateToRegex(template: string): RegExp {
   const escaped = template
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&") // escape regex metachars
-    .replace(/\\\{[^/]+?\\\}/g, "[^/]+"); // {param} → segment matcher
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // escape regex metachars
+    .replace(/\\\{[^/]+?\\\}/g, '[^/]+'); // {param} → segment matcher
   return new RegExp(`^${escaped}/?$`);
 }
 
@@ -72,7 +72,6 @@ export function isCovered(
   const rx = templateToRegex(stripApiPrefix(op.template));
   return hits.some(
     (h) =>
-      h.method.toLowerCase() === op.method &&
-      rx.test(stripApiPrefix(h.path)),
+      h.method.toLowerCase() === op.method && rx.test(stripApiPrefix(h.path)),
   );
 }

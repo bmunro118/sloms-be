@@ -1,5 +1,5 @@
 export enum ItemStatus {
   InProduction = 'InProduction',
-  Ready        = 'Ready',
-  Dispatched   = 'Dispatched',
+  Ready = 'Ready',
+  Dispatched = 'Dispatched',
 }

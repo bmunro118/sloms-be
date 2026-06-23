@@ -1,5 +1,5 @@
-import { createParamDecorator, ExecutionContext } from "@nestjs/common";
-import { Role } from "../../users/entities/role.enum";
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { Role } from '../../users/entities/role.enum';
 
 export interface CurrentUserPayload {
   userId: number;
