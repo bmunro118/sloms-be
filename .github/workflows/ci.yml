@@ -90,6 +90,11 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate --schema=./prisma/schema.prisma
 
+      - name: Install Playwright Chromium
+        # OrderBreakdownService launches Chromium (PDF generation) on app boot,
+        # so booting the Nest app in the e2e tests requires the browser binary.
+        run: npx playwright install --with-deps chromium
+
       - name: Apply migrations
         run: npx prisma migrate deploy
 
