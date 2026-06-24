@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { createTestApp } from './support/app';
 import { api } from './support/http';
 import { authHeader } from './support/http';
+import { e2eDeviceToken } from './support/auth';
 
 /**
  * Auth — login (mobile token vs web cookie), the /me session echo, and the
@@ -21,18 +22,30 @@ describe('Auth (e2e)', () => {
   });
 
   describe('POST /auth/login', () => {
-    it('returns a token to a mobile client on valid credentials', async () => {
+    it('returns a full token to a mobile client on a trusted device', async () => {
       const res = await api(app)
         .post('/api/auth/login')
+        .set('x-device-token', e2eDeviceToken('admin'))
         .send({ username: 'admin', password: 'admin123' })
         .expect(200);
+      expect(res.body.status).toBe('ok');
       expect(res.body.accessToken).toBeDefined();
       expect(res.body.role).toBe('Admin');
     });
 
-    it('sets a cookie (not a body token) for a web client', async () => {
+    it('challenges 2FA on an unrecognised device (mandatory 2FA)', async () => {
       const res = await api(app)
         .post('/api/auth/login')
+        .send({ username: 'admin', password: 'admin123' })
+        .expect(200);
+      expect(res.body.status).toBe('2fa');
+      expect(res.body.twoFactorRequired).toBe(true);
+    });
+
+    it('sets a cookie (not a body token) for a web client on a trusted device', async () => {
+      const res = await api(app)
+        .post('/api/auth/login')
+        .set('x-device-token', e2eDeviceToken('admin'))
         .send({ username: 'admin', password: 'admin123', clientType: 'web' })
         .expect(200);
       expect(res.body.accessToken).toBeUndefined();
@@ -73,6 +86,7 @@ describe('Auth (e2e)', () => {
     it('echoes the session for an authenticated user', async () => {
       const login = await api(app)
         .post('/api/auth/login')
+        .set('x-device-token', e2eDeviceToken('manager'))
         .send({ username: 'manager', password: 'manager123' })
         .expect(200);
       const res = await api(app)
@@ -94,6 +108,7 @@ describe('Auth (e2e)', () => {
     it('rejects an ordinary access token (wrong scope) with 401', async () => {
       const login = await api(app)
         .post('/api/auth/login')
+        .set('x-device-token', e2eDeviceToken('admin'))
         .send({ username: 'admin', password: 'admin123' })
         .expect(200);
       await api(app)

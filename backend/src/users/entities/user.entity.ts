@@ -15,4 +15,8 @@ export interface User {
   createdBy: string | null;
   linkedCustomerId: number | null;
   mustChangePassword: boolean;
+  twoFactorMethod: string | null;
+  twoFactorEnabled: boolean;
+  totpSecret: string | null;
+  twoFactorEnrolledAt: Date | null;
 }

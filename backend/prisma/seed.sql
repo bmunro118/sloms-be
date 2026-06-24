@@ -91,10 +91,34 @@ VALUES
   ('manager',   '$2b$10$rkA.f.VF7Pb9HxYBMyttvueyCHmGHRXZn7hwhxzRNzUFsFaxXEj0W', 'Mary Manager',   'manager@sloms.internal',   'Manager',   true, 'seed'),
   ('operative', '$2b$10$Qqm.IsSg943i9k2F1x45k.4YRP2/5ihlvTE9HERPrVV5GycSORGiG', 'Oliver Operative','operative@sloms.internal', 'Operative', true, 'seed'),
   ('readonly',  '$2b$10$.c1SiOwFCEkX7z/7sHgygu1wLT403t71fPbVbaU6RsGVxZbs7GJHW', 'Rachel Readonly', 'readonly@sloms.internal',  'ReadOnly',  true, 'seed'),
-  ('customer1', '$2b$10$t1cEg2MpruAlfATz2ag.FOMOOeUZgMnYI6ziktWszqD9wMPvKhVLy', 'Jane Doe',       'contact@northwood-hearing.example.com','Customer',  true, 'seed');
+  ('customer1@example.com', '$2b$10$t1cEg2MpruAlfATz2ag.FOMOOeUZgMnYI6ziktWszqD9wMPvKhVLy', 'Jane Doe',       'contact@northwood-hearing.example.com','Customer',  true, 'seed');
 
 -- Link customer1 to the Northwood Hearing branch (CustomerID 1)
-UPDATE "Users" SET "LinkedCustomerID" = 1 WHERE "Username" = 'customer1';
+UPDATE "Users" SET "LinkedCustomerID" = 1 WHERE "Username" = 'customer1@example.com';
+
+-- ============================================
+-- 2FA seed (for e2e + a usable dev baseline)
+-- Mandatory 2FA means a plain username/password login now returns a scoped
+-- enrollment/challenge token, not a full-access token. To keep e2e simple we
+-- enable 2FA for every seed user (staff → TOTP, customers → email) and pre-trust
+-- a known device. The e2e login helper sends `x-device-token: e2e-trust-<username>`
+-- so the new-device challenge is skipped and a full token is issued.
+-- ============================================
+UPDATE "Users" SET "TwoFactorEnabled" = true, "TwoFactorMethod" = 'totp', "TwoFactorEnrolledAt" = now()
+  WHERE "Role" <> 'Customer';
+UPDATE "Users" SET "TwoFactorEnabled" = true, "TwoFactorMethod" = 'email', "TwoFactorEnrolledAt" = now()
+  WHERE "Role" = 'Customer';
+
+INSERT INTO "TrustedDevices" ("UserID", "TokenHash", "Label", "ExpiresAt")
+SELECT "UserID", v.hash, 'e2e seeded device', now() + interval '3650 days'
+FROM "Users" u
+JOIN (VALUES
+  ('admin',                 '4df04c0b7a26628bf0849a52324dec74967f1607ceabcc8ad13a8d8b5261a297'),
+  ('manager',               '3b1196ebbdf97819e9d302f6622355a08b9387223b7f6c02a3c890b322384d03'),
+  ('operative',             '5dea660f64a7316f6b78e6895defc17602306c1e090474093f3c5df72be9d1dd'),
+  ('readonly',              '9054fcea35921a594c8cb0cd866b5afa3f236b235cd0afd0aea75fe2edc132d8'),
+  ('customer1@example.com', '84fdd385754e40628cc829f3ce7ed3f85a4f19b21293b08e66fb581f4b8575ce')
+) AS v(username, hash) ON v.username = u."Username";
 
 -- ============================================
 -- VAT Rates (insert before Orders so FK is satisfied)

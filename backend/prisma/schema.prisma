@@ -21,11 +21,60 @@ model User {
   createdBy          String?   @db.VarChar(100) @map("CreatedBy")
   linkedCustomerId   Int?      @map("LinkedCustomerID")
   mustChangePassword Boolean   @default(false) @map("MustChangePassword")
+  twoFactorMethod    String?   @db.VarChar(10) @map("TwoFactorMethod")
+  twoFactorEnabled   Boolean   @default(false) @map("TwoFactorEnabled")
+  totpSecret         String?   @map("TotpSecret")
+  twoFactorEnrolledAt DateTime? @map("TwoFactorEnrolledAt")
   linkedCustomer     Customer? @relation(fields: [linkedCustomerId], references: [customerId])
   userSettings       UserSetting[]
+  trustedDevices     TrustedDevice[]
+  emailOtps          EmailOtp[]
+  recoveryCodes      RecoveryCode[]
 
   @@index([linkedCustomerId])
   @@map("Users")
+}
+
+model TrustedDevice {
+  id         Int       @id @default(autoincrement()) @map("Id")
+  userId     Int       @map("UserID")
+  tokenHash  String    @unique @db.VarChar(64) @map("TokenHash")
+  label      String?   @db.VarChar(200) @map("Label")
+  userAgent  String?   @db.VarChar(500) @map("UserAgent")
+  ipAddress  String?   @db.VarChar(45) @map("IPAddress")
+  createdAt  DateTime  @default(now()) @map("CreatedAt")
+  lastSeenAt DateTime  @default(now()) @map("LastSeenAt")
+  expiresAt  DateTime  @map("ExpiresAt")
+  revokedAt  DateTime? @map("RevokedAt")
+  user       User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("TrustedDevices")
+}
+
+model EmailOtp {
+  id         Int       @id @default(autoincrement()) @map("Id")
+  userId     Int       @map("UserID")
+  codeHash   String    @db.VarChar(64) @map("CodeHash")
+  expiresAt  DateTime  @map("ExpiresAt")
+  attempts   Int       @default(0) @map("Attempts")
+  consumedAt DateTime? @map("ConsumedAt")
+  createdAt  DateTime  @default(now()) @map("CreatedAt")
+  user       User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("EmailOtps")
+}
+
+model RecoveryCode {
+  id       Int       @id @default(autoincrement()) @map("Id")
+  userId   Int       @map("UserID")
+  codeHash String    @db.VarChar(64) @map("CodeHash")
+  usedAt   DateTime? @map("UsedAt")
+  user     User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("RecoveryCodes")
 }
 
 model Customer {

@@ -196,13 +196,26 @@ describe('UsersService', () => {
       );
 
       await service.create({
-        username: 'custuser',
+        username: 'custuser@example.com',
         password: 'pass',
         role: Role.Customer,
         linkedCustomerId: 10,
       });
 
       expect(mockPrisma.user.create).toHaveBeenCalled();
+    });
+
+    it('rejects a Customer-role user whose username is not an email', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.create({
+          username: 'custuser',
+          password: 'pass',
+          role: Role.Customer,
+          linkedCustomerId: 10,
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

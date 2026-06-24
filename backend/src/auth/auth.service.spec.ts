@@ -1,9 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { UsersService, AuditEvent } from '../users/users.service';
+import { TrustedDeviceService } from './services/trusted-device.service';
+import { EmailOtpService } from './services/email-otp.service';
 import { Role } from '../users/entities/role.enum';
 import { User } from '../users/entities/user.entity';
 
@@ -25,6 +28,23 @@ const mockJwtService = {
   verify: jest.fn(),
 };
 
+const mockConfigService = {
+  get: jest.fn().mockReturnValue({
+    trustDays: 30,
+    pendingTokenTtl: '15m',
+    emailOtpTtlMinutes: 10,
+  }),
+};
+
+const mockTrustedDevices = {
+  isTrusted: jest.fn().mockResolvedValue(true),
+  trust: jest.fn(),
+};
+
+const mockEmailOtp = {
+  send: jest.fn().mockResolvedValue(undefined),
+};
+
 function makeUser(overrides: Partial<User> = {}): User {
   return {
     userId: 1,
@@ -41,6 +61,10 @@ function makeUser(overrides: Partial<User> = {}): User {
     createdBy: null,
     linkedCustomerId: null,
     mustChangePassword: false,
+    twoFactorMethod: 'totp',
+    twoFactorEnabled: true,
+    totpSecret: null,
+    twoFactorEnrolledAt: new Date(),
     ...overrides,
   };
 }
@@ -53,12 +77,16 @@ describe('AuthService', () => {
     mockUsersService.writeAuditLog.mockResolvedValue(undefined);
     mockUsersService.recordLogin.mockResolvedValue(undefined);
     mockUsersService.recordFailedLogin.mockResolvedValue(false);
+    mockTrustedDevices.isTrusted.mockResolvedValue(true);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
+        { provide: ConfigService, useValue: mockConfigService },
+        { provide: TrustedDeviceService, useValue: mockTrustedDevices },
+        { provide: EmailOtpService, useValue: mockEmailOtp },
       ],
     }).compile();
 
@@ -185,6 +213,58 @@ describe('AuthService', () => {
 
       const result = await service.login(user);
       expect(result.linkedCustomerId).toBe(42);
+    });
+
+    it('returns enroll status when 2FA is not yet enabled', async () => {
+      const user = makeUser({
+        twoFactorEnabled: false,
+        twoFactorMethod: 'totp',
+      });
+      mockJwtService.sign.mockReturnValue('enroll-token');
+
+      const result = await service.login(user);
+
+      expect(result.status).toBe('enroll');
+      expect(result.enrollRequired).toBe(true);
+      expect(result.twoFactorMethod).toBe('totp');
+      expect(mockJwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: 'twofa_enroll' }),
+        { expiresIn: '15m' },
+      );
+    });
+
+    it('returns 2fa status and sends email for an untrusted email-2FA user', async () => {
+      const user = makeUser({
+        twoFactorEnabled: true,
+        twoFactorMethod: 'email',
+        role: Role.Customer,
+        username: 'cust@example.com',
+        email: null,
+        linkedCustomerId: 7,
+      });
+      mockTrustedDevices.isTrusted.mockResolvedValue(false);
+      mockJwtService.sign.mockReturnValue('pending-token');
+
+      const result = await service.login(user, { deviceToken: null });
+
+      expect(result.status).toBe('2fa');
+      expect(result.twoFactorRequired).toBe(true);
+      expect(mockEmailOtp.send).toHaveBeenCalledWith(1, 'cust@example.com');
+      expect(mockJwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: 'twofa_pending' }),
+        { expiresIn: '15m' },
+      );
+    });
+
+    it('skips 2FA for an enabled user on a trusted device', async () => {
+      const user = makeUser({ twoFactorEnabled: true });
+      mockTrustedDevices.isTrusted.mockResolvedValue(true);
+      mockJwtService.sign.mockReturnValue('full-token');
+
+      const result = await service.login(user, { deviceToken: 'tok' });
+
+      expect(result.status).toBe('ok');
+      expect(result.accessToken).toBe('full-token');
     });
   });
 

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import databaseConfig from './config/database.config';
+import twofaConfig from './config/twofa.config';
 import { CustomersModule } from './customers/customers.module';
 import { OrderBreakdownModule } from './order-breakdown/order-breakdown.module';
 import { OrdersModule } from './orders/orders.module';
@@ -15,7 +16,7 @@ import { PrismaModule } from './prisma/prisma.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig],
+      load: [databaseConfig, twofaConfig],
     }),
     PrismaModule,
 
