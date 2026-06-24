@@ -50,3 +50,57 @@ jobs:
 
       - name: Build
         run: npx nest build
+
+  e2e:
+    name: Integration (e2e) tests
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/slomsdb
+      JWT_SECRET: test-jwt-secret
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: slomsdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=./prisma/schema.prisma
+
+      - name: Install Playwright Chromium
+        # OrderBreakdownService launches Chromium (PDF generation) on app boot,
+        # so booting the Nest app in the e2e tests requires the browser binary.
+        run: npx playwright install --with-deps chromium
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed database
+        # psql is preinstalled on ubuntu-latest runners.
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f prisma/seed.sql
+
+      - name: Run e2e tests
+        run: npm run test:e2e
