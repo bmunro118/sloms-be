@@ -6,6 +6,10 @@ They exist because the mock-based unit specs structurally cannot catch the bugs
 that actually shipped — `forbidNonWhitelisted` 400s, date-only 500s, the
 `Counter` column-casing serial bug. See [orders.e2e-spec.ts](orders.e2e-spec.ts).
 
+> For **manual** 2FA testing from the Swagger UI (TOTP enrollment, email OTP,
+> new-device challenge, recovery codes), see
+> [docs/testing-2fa-via-swagger.md](../docs/testing-2fa-via-swagger.md).
+
 ## Running
 
 ```bash
