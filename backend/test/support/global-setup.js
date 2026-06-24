@@ -1,4 +1,4 @@
-// Jest globalSetup (plain JS so it runs without the ts-jest transform).
+// Jest globalSetup (plain JS so it runs without the TS/swc transform).
 // Clears the cross-spec coverage hits file once at the start of every e2e run,
 // so the coverage guard only sees routes exercised by *this* run.
 const fs = require("fs");

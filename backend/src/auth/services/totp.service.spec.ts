@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { authenticator } from 'otplib';
+import { generate } from 'otplib';
 import { TotpService } from './totp.service';
 
 const mockConfig = {
@@ -36,12 +36,12 @@ describe('TotpService', () => {
     expect(service.decrypt(encrypted)).toBe(secret);
   });
 
-  it('verifies a current token and rejects a wrong one', () => {
+  it('verifies a current token and rejects a wrong one', async () => {
     const secret = service.generateSecret();
-    const validToken = authenticator.generate(secret);
+    const validToken = await generate({ secret });
 
-    expect(service.verifyToken(validToken, secret)).toBe(true);
-    expect(service.verifyToken('000000', secret)).toBe(false);
+    expect(await service.verifyToken(validToken, secret)).toBe(true);
+    expect(await service.verifyToken('000000', secret)).toBe(false);
   });
 
   it('builds an otpauth URI and a QR data URL', async () => {
