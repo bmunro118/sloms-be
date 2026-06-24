@@ -1,89 +1,40 @@
 # CI/CD setup
 
-Two workflows live in `.github/workflows`:
+Branch-driven environments with a build-once / promote-the-artifact model.
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `ci.yml` | PRs + pushes to any branch except `main` | `npm ci`, `prisma generate`, lint, test, `nest build` |
-| `cd.yml` | manual `workflow_dispatch` (run against `main`) | Build & push the Docker image to ACR, then `az containerapp update` |
+| `ci.yml` | PRs + pushes to any branch except `main` | lint, unit tests, build; plus an e2e job (Postgres service → migrate → seed → `test:e2e`) |
+| `deploy-dev.yml` | push to `integration` (or manual) | builds the image, pushes `:<sha>` + `:latest` to ACR, deploys to **dev** (`slomsapi` / rg `sloms`) |
+| `deploy-prod.yml` | push to `main` (or manual) | **no rebuild** — promotes the image dev is currently running to **prod** (`slomsapi-prod` / rg `sloms-prod`) |
 
-Tests and the production build also run *inside* `backend/Dockerfile`, so a CD run can't deploy an image whose tests fail.
+Flow: feature branch → PR → **`integration`** (auto-deploys to dev) → validate → merge **`integration` → `main`** (promotes the validated image to prod). A manual `deploy-prod` run can override the image via the `image` input.
 
-## One-time Azure setup (OIDC, no stored secrets)
+Tests and the production build also run *inside* `backend/Dockerfile`, so dev can't deploy an image whose tests fail; prod only ever runs an image that already passed through dev.
 
-GitHub authenticates to Azure with short-lived OIDC tokens — there is no
-long-lived credential to rotate. Run these once (replace the org/repo if it ever
-moves). Requires `az login` as someone who can create app registrations and
-assign roles.
+## Environments & OIDC
 
-```bash
-SUBSCRIPTION_ID=295f53a3-9253-4547-8062-51d425160903
-RESOURCE_GROUP=sloms
-ACR_NAME=slomsacregistry2026
-APP_NAME=sloms-be-github-actions
-REPO=Sonic-Labs-Ltd/sloms-be
+GitHub authenticates to Azure with short-lived OIDC tokens (no stored credential). Auth is federated on **GitHub Environments**, so each deploy job declares `environment: dev` / `environment: prod` and the OIDC subject is `repo:<repo>:environment:<env>`.
 
-# 1. Create an app registration + service principal
-APP_ID=$(az ad app create --display-name "$APP_NAME" --query appId -o tsv)
-az ad sp create --id "$APP_ID"
-OBJECT_ID=$(az ad app show --id "$APP_ID" --query id -o tsv)
+Provisioned:
+- App registration `sloms-be-github-actions` (clientId `30f54ec7-…`), federated creds for `environment:dev` and `environment:prod`.
+- Roles: `AcrPush` on the shared registry `slomsacregistry2026`; `Contributor` on both `sloms` and `sloms-prod`.
+- Repo secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+- GitHub Environments `dev` and `prod` (add required reviewers on `prod` if you want manual approval before prod promotes).
 
-# 2. Federated credential: trust pushes to the main branch of this repo
-az ad app federated-credential create \
-  --id "$OBJECT_ID" \
-  --parameters '{
-    "name": "github-main",
-    "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:'"$REPO"':ref:refs/heads/main",
-    "audiences": ["api://AzureADTokenExchange"]
-  }'
+## Topology
 
-# (Optional) also trust the "production" GitHub Environment, used by cd.yml:
-az ad app federated-credential create \
-  --id "$OBJECT_ID" \
-  --parameters '{
-    "name": "github-env-production",
-    "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:'"$REPO"':environment:production",
-    "audiences": ["api://AzureADTokenExchange"]
-  }'
+| | dev | prod |
+| --- | --- | --- |
+| Resource group | `sloms` | `sloms-prod` |
+| Container App | `slomsapi` | `slomsapi-prod` |
+| Postgres | `sloms-postgres` | `sloms-postgres-prod` |
+| Key Vault | `sloms-kv` | `sloms-kv-prod` |
+| Registry | `slomsacregistry2026` (shared) | ← same |
 
-# 3. Grant the SP the rights it needs
-SP_ID=$(az ad sp show --id "$APP_ID" --query id -o tsv)
+Each Container App pulls the image and reads its secrets (`database-url`, `jwt-secret`) from its own Key Vault via its system-assigned managed identity — no stored registry password or app secrets.
 
-#    Push images to ACR
-ACR_ID=$(az acr show --name "$ACR_NAME" --query id -o tsv)
-az role assignment create --assignee-object-id "$SP_ID" \
-  --assignee-principal-type ServicePrincipal \
-  --role AcrPush --scope "$ACR_ID"
+## Recommended
 
-#    Update the Container App (Contributor on the resource group is simplest)
-az role assignment create --assignee-object-id "$SP_ID" \
-  --assignee-principal-type ServicePrincipal \
-  --role Contributor \
-  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP"
-
-# 4. Print the three values to store as GitHub secrets
-echo "AZURE_CLIENT_ID=$APP_ID"
-echo "AZURE_TENANT_ID=$(az account show --query tenantId -o tsv)"
-echo "AZURE_SUBSCRIPTION_ID=$SUBSCRIPTION_ID"
-```
-
-## GitHub repo configuration
-
-1. **Settings → Secrets and variables → Actions → New repository secret** — add:
-   - `AZURE_CLIENT_ID`
-   - `AZURE_TENANT_ID`
-   - `AZURE_SUBSCRIPTION_ID`
-2. **Settings → Environments → New environment** named `production`. Optionally
-   add required reviewers there to make deploys manual-approval.
-3. (Recommended) **Settings → Branches** — protect `main` and require the CI
-   check to pass before merge.
-
-## Notes
-
-- The Container App `slomsapi` must already exist (it does, per
-  `backend/src/config/containerapp-config.yaml`). `cd.yml` only updates its
-  image; it does not create the app or environment.
-- The `subject` in step 2 must match exactly. If you later deploy from a
-  different branch or environment, add another federated credential for it.
+- Protect `main` (require PRs / passing CI) so prod only updates via an `integration → main` merge.
+- Before real go-live, replace the seeded sample data in prod and rotate the seed login credentials.

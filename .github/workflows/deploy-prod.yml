@@ -1,0 +1,66 @@
+name: Deploy to prod
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Full image ref to deploy. Leave blank to promote the image currently running in dev."
+        required: false
+        default: ""
+
+# One prod deploy at a time.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  DEV_RESOURCE_GROUP: sloms
+  DEV_CONTAINERAPP: slomsapi
+  PROD_RESOURCE_GROUP: sloms-prod
+  PROD_CONTAINERAPP: slomsapi-prod
+
+jobs:
+  promote:
+    name: Promote dev image to prod
+    runs-on: ubuntu-latest
+    environment: prod # OIDC subject repo:...:environment:prod
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve image to promote
+        id: img
+        # No rebuild: deploy the exact image dev validated (or an explicit override).
+        run: |
+          IMG="${{ github.event.inputs.image }}"
+          if [ -z "$IMG" ]; then
+            IMG=$(az containerapp show -n "$DEV_CONTAINERAPP" -g "$DEV_RESOURCE_GROUP" \
+              --query "properties.template.containers[0].image" -o tsv)
+          fi
+          if [ -z "$IMG" ]; then echo "Could not resolve an image to promote" >&2; exit 1; fi
+          echo "image=$IMG" >> "$GITHUB_OUTPUT"
+          echo "Promoting to prod: $IMG"
+
+      - name: Deploy to prod Container App
+        run: |
+          az containerapp update \
+            --name "$PROD_CONTAINERAPP" \
+            --resource-group "$PROD_RESOURCE_GROUP" \
+            --image "${{ steps.img.outputs.image }}"
+
+      - name: Show result
+        run: |
+          fqdn=$(az containerapp show -n "$PROD_CONTAINERAPP" -g "$PROD_RESOURCE_GROUP" \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+          echo "Prod now running ${{ steps.img.outputs.image }}"
+          echo "https://$fqdn"
