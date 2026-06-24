@@ -1,16 +1,16 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { authenticator } from 'otplib';
+import { generateSecret, generateURI, verify } from 'otplib';
 import * as QRCode from 'qrcode';
 import { TwoFactorConfig } from '../../config/twofa.config';
 import { encryptSecret, decryptSecret } from '../crypto.util';
 
+/** Allow ±1 time-step (30s) to tolerate clock skew between server and device. */
+const EPOCH_TOLERANCE_SECONDS = 30;
+
 @Injectable()
 export class TotpService {
-  constructor(private readonly config: ConfigService) {
-    // Allow a ±1 time-step (30s) window to tolerate clock skew.
-    authenticator.options = { window: 1 };
-  }
+  constructor(private readonly config: ConfigService) {}
 
   private get cfg(): TwoFactorConfig {
     return this.config.get<TwoFactorConfig>('twofa')!;
@@ -27,7 +27,7 @@ export class TotpService {
   }
 
   generateSecret(): string {
-    return authenticator.generateSecret();
+    return generateSecret();
   }
 
   /** Builds the otpauth:// URI and a QR-code data URL for authenticator apps. */
@@ -35,18 +35,23 @@ export class TotpService {
     username: string,
     secret: string,
   ): Promise<{ otpauthUrl: string; qrDataUrl: string }> {
-    const otpauthUrl = authenticator.keyuri(
-      username,
-      this.cfg.totpIssuer,
+    const otpauthUrl = generateURI({
+      issuer: this.cfg.totpIssuer,
+      label: username,
       secret,
-    );
+    });
     const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
     return { otpauthUrl, qrDataUrl };
   }
 
-  verifyToken(token: string, secret: string): boolean {
+  async verifyToken(token: string, secret: string): Promise<boolean> {
     try {
-      return authenticator.verify({ token: token.trim(), secret });
+      const result = await verify({
+        token: token.trim(),
+        secret,
+        epochTolerance: EPOCH_TOLERANCE_SECONDS,
+      });
+      return result.valid;
     } catch {
       return false;
     }

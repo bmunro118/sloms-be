@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { authenticator } from 'otplib';
+import { generate } from 'otplib';
 import { createTestApp } from './support/app';
 import { api, authHeader } from './support/http';
 import { login, e2eDeviceToken } from './support/auth';
@@ -81,7 +81,10 @@ describe('2FA (e2e)', () => {
     const enable = await api(app)
       .post('/api/auth/2fa/enable')
       .set(authHeader(enrollToken))
-      .send({ code: authenticator.generate(totpSecret), rememberDevice: true })
+      .send({
+        code: await generate({ secret: totpSecret }),
+        rememberDevice: true,
+      })
       .expect(200);
     expect(enable.body.status).toBe('ok');
     expect(enable.body.recoveryCodes).toHaveLength(8);
@@ -108,7 +111,7 @@ describe('2FA (e2e)', () => {
     const verified = await api(app)
       .post('/api/auth/verify-2fa')
       .set(authHeader(challenge.body.accessToken))
-      .send({ code: authenticator.generate(totpSecret) })
+      .send({ code: await generate({ secret: totpSecret }) })
       .expect(200);
     expect(verified.body.status).toBe('ok');
     expect(verified.body.accessToken).toBeDefined();
@@ -151,7 +154,7 @@ describe('2FA (e2e)', () => {
     await api(app)
       .post('/api/auth/2fa/disable')
       .set(authHeader(fullToken))
-      .send({ code: authenticator.generate(totpSecret) })
+      .send({ code: await generate({ secret: totpSecret }) })
       .expect(200);
   });
 
