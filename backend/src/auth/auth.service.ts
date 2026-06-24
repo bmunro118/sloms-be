@@ -1,15 +1,47 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { UsersService, AuditEvent } from '../users/users.service';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { User } from '../users/entities/user.entity';
+import { TrustedDeviceService } from './services/trusted-device.service';
+import { EmailOtpService } from './services/email-otp.service';
+import { TwoFactorConfig } from '../config/twofa.config';
+
+/** Context carried from the HTTP request into the login flow. */
+export interface LoginContext {
+  ipAddress?: string;
+  userAgent?: string | null;
+  /** The raw trusted-device token presented by the client (cookie / header). */
+  deviceToken?: string | null;
+}
+
+export type LoginStatus = 'ok' | 'password_change' | 'enroll' | '2fa';
+
+export interface LoginResult {
+  status: LoginStatus;
+  accessToken: string;
+  userId: number;
+  username: string;
+  role: string;
+  fullName: string | null;
+  linkedCustomerId: number | null;
+  /** @deprecated use status — kept for client compatibility */
+  mustChangePassword?: true;
+  enrollRequired?: true;
+  twoFactorRequired?: true;
+  twoFactorMethod?: 'totp' | 'email';
+}
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+    private readonly trustedDevices: TrustedDeviceService,
+    private readonly emailOtp: EmailOtpService,
   ) {}
 
   /**
@@ -105,78 +137,116 @@ export class AuthService {
     return user;
   }
 
-  /**
-   * Issues a signed JWT for a successfully authenticated user.
-   * If mustChangePassword is set, issues a short-lived scoped token instead of a full-access token.
-   * The scoped token is only accepted by POST /auth/change-password.
-   */
-  async login(
-    user: User,
-    ipAddress?: string,
-  ): Promise<{
-    accessToken: string;
-    userId: number;
-    username: string;
-    role: string;
-    fullName: string | null;
-    linkedCustomerId: number | null;
-    mustChangePassword?: true;
-  }> {
-    // Reset failed-login state since credentials were valid
-    this.usersService.recordLogin(user.userId).catch(() => {});
+  private get twofaCfg(): TwoFactorConfig {
+    return this.config.get<TwoFactorConfig>('twofa')!;
+  }
 
-    if (user.mustChangePassword) {
-      const payload: JwtPayload = {
-        sub: user.userId,
-        username: user.username,
-        role: user.role,
-        linkedCustomerId: user.linkedCustomerId ?? null,
-        scope: 'password_change',
-      };
-      this.usersService
-        .writeAuditLog(
-          user.username,
-          AuditEvent.PASSWORD_CHANGE_REQUIRED,
-          undefined,
-          user.userId,
-          ipAddress,
-        )
-        .catch(() => {});
-      return {
-        accessToken: this.jwtService.sign(payload, { expiresIn: '15m' }),
-        mustChangePassword: true,
-        userId: user.userId,
-        username: user.username,
-        role: user.role,
-        fullName: user.fullName ?? null,
-        linkedCustomerId: user.linkedCustomerId ?? null,
-      };
-    }
-
-    const payload: JwtPayload = {
-      sub: user.userId,
-      username: user.username,
-      role: user.role,
-      linkedCustomerId: user.linkedCustomerId ?? null,
-    };
-    this.usersService
-      .writeAuditLog(
-        user.username,
-        AuditEvent.LOGIN_SUCCESS,
-        undefined,
-        user.userId,
-        ipAddress,
-      )
-      .catch(() => {});
-
+  private baseFields(user: User) {
     return {
-      accessToken: this.jwtService.sign(payload),
       userId: user.userId,
       username: user.username,
       role: user.role,
       fullName: user.fullName ?? null,
       linkedCustomerId: user.linkedCustomerId ?? null,
     };
+  }
+
+  private signScoped(user: User, scope: JwtPayload['scope']): string {
+    const payload: JwtPayload = {
+      sub: user.userId,
+      username: user.username,
+      role: user.role,
+      linkedCustomerId: user.linkedCustomerId ?? null,
+      scope,
+    };
+    return this.jwtService.sign(payload, {
+      expiresIn: this.twofaCfg.pendingTokenTtl as any,
+    });
+  }
+
+  /** Issues a full-access (scopeless) token. */
+  issueFullToken(user: User): LoginResult {
+    const payload: JwtPayload = {
+      sub: user.userId,
+      username: user.username,
+      role: user.role,
+      linkedCustomerId: user.linkedCustomerId ?? null,
+    };
+    return {
+      status: 'ok',
+      accessToken: this.jwtService.sign(payload),
+      ...this.baseFields(user),
+    };
+  }
+
+  /**
+   * Decides what a successful password check grants. Precedence:
+   *   1. forced password change  → password_change scoped token
+   *   2. 2FA not yet enrolled     → twofa_enroll scoped token (mandatory enrollment)
+   *   3. new (untrusted) device   → twofa_pending scoped token (+ email code sent)
+   *   4. otherwise                → full-access token
+   */
+  async login(user: User, ctx: LoginContext = {}): Promise<LoginResult> {
+    const { ipAddress } = ctx;
+    // Reset failed-login state since credentials were valid
+    this.usersService.recordLogin(user.userId).catch(() => {});
+
+    if (user.mustChangePassword) {
+      this.audit(user, AuditEvent.PASSWORD_CHANGE_REQUIRED, ipAddress);
+      return {
+        status: 'password_change',
+        accessToken: this.signScoped(user, 'password_change'),
+        mustChangePassword: true,
+        ...this.baseFields(user),
+      };
+    }
+
+    const method = (user.twoFactorMethod ?? 'totp') as 'totp' | 'email';
+
+    if (!user.twoFactorEnabled) {
+      this.audit(user, AuditEvent.TWOFA_ENROLL_REQUIRED, ipAddress);
+      return {
+        status: 'enroll',
+        accessToken: this.signScoped(user, 'twofa_enroll'),
+        enrollRequired: true,
+        twoFactorMethod: method,
+        ...this.baseFields(user),
+      };
+    }
+
+    const trusted = await this.trustedDevices.isTrusted(
+      user.userId,
+      ctx.deviceToken,
+    );
+    if (!trusted) {
+      this.audit(user, AuditEvent.NEW_DEVICE_CHALLENGED, ipAddress);
+      if (method === 'email') {
+        // username is the customer's email; deliver the login code there.
+        await this.emailOtp.send(user.userId, user.email ?? user.username);
+      }
+      return {
+        status: '2fa',
+        accessToken: this.signScoped(user, 'twofa_pending'),
+        twoFactorRequired: true,
+        twoFactorMethod: method,
+        ...this.baseFields(user),
+      };
+    }
+
+    this.audit(user, AuditEvent.LOGIN_SUCCESS, ipAddress);
+    return this.issueFullToken(user);
+  }
+
+  private audit(user: User, event: string, ipAddress?: string): void {
+    this.usersService
+      .writeAuditLog(
+        user.username,
+        event as Parameters<UsersService['writeAuditLog']>[1],
+        undefined,
+        user.userId,
+        ipAddress,
+      )
+      .catch(() => {});
   }
 
   /**
@@ -187,8 +257,8 @@ export class AuthService {
     userId: number,
     username: string,
     newPassword: string,
-    ipAddress?: string,
-  ) {
+    ctx: LoginContext = {},
+  ): Promise<LoginResult> {
     await this.usersService.setNewPasswordAndClearFlag(userId, newPassword);
     this.usersService
       .writeAuditLog(
@@ -196,12 +266,13 @@ export class AuthService {
         AuditEvent.PASSWORD_CHANGED,
         undefined,
         userId,
-        ipAddress,
+        ctx.ipAddress,
       )
       .catch(() => {});
     const user = await this.usersService.findByUsername(username);
-    // user cannot be null here — we just updated it
-    return this.login(user!, ipAddress);
+    // user cannot be null here — we just updated it. Re-run the gate so the
+    // user still hits 2FA enrollment / new-device challenge as appropriate.
+    return this.login(user!, ctx);
   }
 
   /**

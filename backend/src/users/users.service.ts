@@ -17,6 +17,13 @@ import { AuditLogEntry } from './entities/audit-log.entity';
 
 const SALT_ROUNDS = 12;
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Customers log in with their email (it's also their 2FA delivery address). */
+function defaultTwoFactorMethod(role: Role): 'email' | 'totp' {
+  return role === Role.Customer ? 'email' : 'totp';
+}
+
 const MAX_FAILED_ATTEMPTS = parseInt(
   process.env.AUTH_MAX_FAILED_ATTEMPTS ?? '5',
   10,
@@ -31,6 +38,15 @@ export const AuditEvent = {
   ACCOUNT_UNLOCKED: 'ACCOUNT_UNLOCKED',
   PASSWORD_CHANGE_REQUIRED: 'PASSWORD_CHANGE_REQUIRED',
   PASSWORD_CHANGED: 'PASSWORD_CHANGED',
+  TWOFA_ENROLLED: 'TWOFA_ENROLLED',
+  TWOFA_DISABLED: 'TWOFA_DISABLED',
+  TWOFA_VERIFY_SUCCESS: 'TWOFA_VERIFY_SUCCESS',
+  TWOFA_VERIFY_FAILURE: 'TWOFA_VERIFY_FAILURE',
+  TWOFA_ENROLL_REQUIRED: 'TWOFA_ENROLL_REQUIRED',
+  NEW_DEVICE_CHALLENGED: 'NEW_DEVICE_CHALLENGED',
+  DEVICE_TRUSTED: 'DEVICE_TRUSTED',
+  DEVICE_REVOKED: 'DEVICE_REVOKED',
+  RECOVERY_CODE_USED: 'RECOVERY_CODE_USED',
 } as const;
 
 export type AuditEventType = (typeof AuditEvent)[keyof typeof AuditEvent];
@@ -104,6 +120,13 @@ export class UsersService {
       );
     }
 
+    const role = dto.role ?? Role.ReadOnly;
+    if (role === Role.Customer && !EMAIL_RE.test(dto.username)) {
+      throw new BadRequestException(
+        'A Customer user must have a valid email address as their username',
+      );
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const user = await this.prisma.user.create({
       data: {
@@ -111,11 +134,12 @@ export class UsersService {
         passwordHash,
         fullName: dto.fullName ?? null,
         email: dto.email ?? null,
-        role: dto.role ?? Role.ReadOnly,
+        role,
         isActive: true,
         createdBy: createdBy ?? null,
         linkedCustomerId: dto.linkedCustomerId ?? null,
         mustChangePassword: true,
+        twoFactorMethod: defaultTwoFactorMethod(role),
       },
     });
 
@@ -158,6 +182,13 @@ export class UsersService {
       );
     }
 
+    const effectiveUsername = dto.username ?? user.username;
+    if (effectiveRole === Role.Customer && !EMAIL_RE.test(effectiveUsername)) {
+      throw new BadRequestException(
+        'A Customer user must have a valid email address as their username',
+      );
+    }
+
     const data: Record<string, unknown> = {};
 
     if (dto.username !== undefined) data.username = dto.username;
@@ -166,10 +197,18 @@ export class UsersService {
     }
     if (dto.fullName !== undefined) data.fullName = dto.fullName;
     if (dto.email !== undefined) data.email = dto.email;
-    if (dto.role !== undefined) data.role = dto.role;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
     if (dto.linkedCustomerId !== undefined) {
       data.linkedCustomerId = dto.linkedCustomerId;
+    }
+    // Changing role switches the 2FA channel — reset enrollment so the user
+    // re-enrolls on the correct factor (TOTP for staff, email for customers).
+    if (dto.role !== undefined && dto.role !== user.role) {
+      data.role = dto.role;
+      data.twoFactorMethod = defaultTwoFactorMethod(dto.role);
+      data.twoFactorEnabled = false;
+      data.totpSecret = null;
+      data.twoFactorEnrolledAt = null;
     }
 
     const saved = await this.prisma.user.update({
@@ -381,6 +420,43 @@ export class UsersService {
       data: {
         passwordHash: await bcrypt.hash(newPassword, SALT_ROUNDS),
         mustChangePassword: false,
+      },
+    });
+  }
+
+  /** Returns the full user record (including secrets) by id, or null. */
+  async findByIdRaw(id: number): Promise<User | null> {
+    const user = await this.prisma.user.findUnique({ where: { userId: id } });
+    return user ? serializePrisma<User>(user) : null;
+  }
+
+  /** Stores an encrypted TOTP secret during enrollment (2FA not yet enabled). */
+  async setPendingTotpSecret(
+    id: number,
+    encryptedSecret: string,
+  ): Promise<void> {
+    await this.prisma.user.update({
+      where: { userId: id },
+      data: { totpSecret: encryptedSecret },
+    });
+  }
+
+  /** Marks 2FA as enabled after a successful enrollment verification. */
+  async enableTwoFactor(id: number): Promise<void> {
+    await this.prisma.user.update({
+      where: { userId: id },
+      data: { twoFactorEnabled: true, twoFactorEnrolledAt: new Date() },
+    });
+  }
+
+  /** Disables 2FA and clears any TOTP secret. */
+  async disableTwoFactor(id: number): Promise<void> {
+    await this.prisma.user.update({
+      where: { userId: id },
+      data: {
+        twoFactorEnabled: false,
+        totpSecret: null,
+        twoFactorEnrolledAt: null,
       },
     });
   }

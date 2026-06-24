@@ -24,6 +24,7 @@
     "test:e2e:cov": "cross-env COVERAGE_GUARD=1 jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@azure/communication-email": "^1.1.0",
     "@nestjs/common": "10.4.22",
     "@nestjs/config": "4.0.3",
     "@nestjs/core": "10.4.22",
@@ -40,11 +41,13 @@
     "cookie-parser": "^1.4.7",
     "csv-parse": "^6.2.1",
     "csv-stringify": "^6.7.0",
+    "otplib": "^12.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "playwright": "^1.59.1",
     "prisma": "7.5.0",
+    "qrcode": "^1.5.4",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1"
@@ -62,6 +65,7 @@
     "@types/node": "^20.3.1",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
+    "@types/qrcode": "^1.5.6",
     "@types/supertest": "^2.0.12",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",

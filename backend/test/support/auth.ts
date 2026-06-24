@@ -13,8 +13,18 @@ export const SEED_USERS: Record<Role, { username: string; password: string }> =
     [Role.Manager]: { username: 'manager', password: 'manager123' },
     [Role.Operative]: { username: 'operative', password: 'operative123' },
     [Role.ReadOnly]: { username: 'readonly', password: 'readonly123' },
-    [Role.Customer]: { username: 'customer1', password: 'customer123' },
+    [Role.Customer]: {
+      username: 'customer1@example.com',
+      password: 'customer123',
+    },
   };
+
+/**
+ * Raw trusted-device token for a seed user. The seed pre-inserts a TrustedDevice
+ * whose hash matches this, so sending it as `x-device-token` skips the
+ * mandatory-2FA new-device challenge and yields a full-access token.
+ */
+export const e2eDeviceToken = (username: string) => `e2e-trust-${username}`;
 
 /** Log a single user in (mobile flow → token in the response body). */
 export async function login(
@@ -24,6 +34,7 @@ export async function login(
 ): Promise<string> {
   const res = await api(app)
     .post('/api/auth/login')
+    .set('x-device-token', e2eDeviceToken(username))
     .send({ username, password })
     .expect(200);
   const token = res.body.accessToken;

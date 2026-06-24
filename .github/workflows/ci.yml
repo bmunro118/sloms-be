@@ -57,6 +57,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/slomsdb
       JWT_SECRET: test-jwt-secret
+      # 2FA TOTP secret-encryption key (test-only; prod uses Key Vault totp-enc-key).
+      TOTP_ENC_KEY: test-totp-enc-key
+      # ACS_CONNECTION_STRING intentionally unset → email OTP codes are logged, not sent.
 
     services:
       postgres:
