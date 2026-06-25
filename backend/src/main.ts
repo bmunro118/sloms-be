@@ -35,7 +35,7 @@ async function bootstrap() {
   const DEFAULT_CORS_ORIGINS = [
     'http://localhost:8081', // Expo web dev server
     'http://localhost:8082', // Playwright e2e web server
-    'https://slomsweb.wonderfulsky-1907992c.uksouth.azurecontainerapps.io', // dev FE
+    'https://slomsweb-stage.braveground-4ef3bd79.uksouth.azurecontainerapps.io', // stage FE
     'https://slomsweb-prod.victoriousfield-9e54908e.uksouth.azurecontainerapps.io', // prod FE
   ];
   const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')

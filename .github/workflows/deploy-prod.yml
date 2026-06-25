@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: "Full image ref to deploy. Leave blank to promote the image currently running in dev."
+        description: "Full image ref to deploy. Leave blank to promote the image currently running in stage."
         required: false
         default: ""
 
@@ -20,8 +20,8 @@ permissions:
   contents: read
 
 env:
-  DEV_RESOURCE_GROUP: sloms
-  DEV_CONTAINERAPP: slomsapi
+  STAGE_RESOURCE_GROUP: sloms-stage
+  STAGE_CONTAINERAPP: slomsapi-stage
   PROD_RESOURCE_GROUP: sloms-prod
   PROD_CONTAINERAPP: slomsapi-prod
 
@@ -40,11 +40,11 @@ jobs:
 
       - name: Resolve image to promote
         id: img
-        # No rebuild: deploy the exact image dev validated (or an explicit override).
+        # No rebuild: deploy the exact image stage validated (or an explicit override).
         run: |
           IMG="${{ github.event.inputs.image }}"
           if [ -z "$IMG" ]; then
-            IMG=$(az containerapp show -n "$DEV_CONTAINERAPP" -g "$DEV_RESOURCE_GROUP" \
+            IMG=$(az containerapp show -n "$STAGE_CONTAINERAPP" -g "$STAGE_RESOURCE_GROUP" \
               --query "properties.template.containers[0].image" -o tsv)
           fi
           if [ -z "$IMG" ]; then echo "Could not resolve an image to promote" >&2; exit 1; fi
