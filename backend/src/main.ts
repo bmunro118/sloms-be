@@ -25,8 +25,28 @@ async function bootstrap() {
     }),
   );
 
-  // Enable CORS for frontend access
-  app.enableCors();
+  // Enable CORS for frontend access.
+  // Web clients authenticate with an HttpOnly cookie, so the browser sends
+  // *credentialed* requests. Those are blocked under a wildcard origin — the
+  // response must echo the specific request origin AND set
+  // Access-Control-Allow-Credentials: true. Origins are configurable via
+  // CORS_ALLOWED_ORIGINS (comma-separated); defaults cover local dev + the
+  // deployed frontends.
+  const DEFAULT_CORS_ORIGINS = [
+    'http://localhost:8081', // Expo web dev server
+    'http://localhost:8082', // Playwright e2e web server
+    'https://slomsweb.wonderfulsky-1907992c.uksouth.azurecontainerapps.io', // dev FE
+    'https://slomsweb-prod.victoriousfield-9e54908e.uksouth.azurecontainerapps.io', // prod FE
+  ];
+  const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.enableCors({
+    origin:
+      configuredOrigins.length > 0 ? configuredOrigins : DEFAULT_CORS_ORIGINS,
+    credentials: true,
+  });
 
   // ─── Swagger / OpenAPI ────────────────────────────────────────────────────
   const swaggerConfig = new DocumentBuilder()
