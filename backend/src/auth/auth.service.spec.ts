@@ -30,6 +30,7 @@ const mockJwtService = {
 
 const mockConfigService = {
   get: jest.fn().mockReturnValue({
+    enforce: true,
     trustDays: 30,
     pendingTokenTtl: '15m',
     emailOtpTtlMinutes: 10,
@@ -213,6 +214,23 @@ describe('AuthService', () => {
 
       const result = await service.login(user);
       expect(result.linkedCustomerId).toBe(42);
+    });
+
+    it('issues a full token without 2FA when enforcement is disabled', async () => {
+      mockConfigService.get.mockReturnValueOnce({
+        enforce: false,
+        trustDays: 30,
+        pendingTokenTtl: '15m',
+        emailOtpTtlMinutes: 10,
+      });
+      const user = makeUser({ twoFactorEnabled: false });
+      mockJwtService.sign.mockReturnValue('full-token');
+
+      const result = await service.login(user);
+
+      expect(result.status).toBe('ok');
+      expect(result.accessToken).toBe('full-token');
+      expect(result.enrollRequired).toBeUndefined();
     });
 
     it('returns enroll status when 2FA is not yet enabled', async () => {
