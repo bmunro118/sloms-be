@@ -1,6 +1,14 @@
 import { registerAs } from '@nestjs/config';
 
 export type TwoFactorConfig = {
+  /**
+   * Master switch for two-factor auth. When false, a valid username/password
+   * login issues a full-access token directly — mandatory enrollment and the
+   * new-device challenge are skipped. Defaults true (2FA enforced). Set
+   * TWOFA_ENFORCE=false to allow plain login (e.g. until the frontend ships a
+   * 2FA UI).
+   */
+  enforce: boolean;
   /** How long a device stays trusted before 2FA is required again, in days (sliding). */
   trustDays: number;
   /** Lifetime of an emailed OTP code, in minutes. */
@@ -26,9 +34,15 @@ function int(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function bool(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value === '') return fallback;
+  return !['false', '0', 'no', 'off'].includes(value.trim().toLowerCase());
+}
+
 export default registerAs(
   'twofa',
   (): TwoFactorConfig => ({
+    enforce: bool(process.env.TWOFA_ENFORCE, true),
     trustDays: int(process.env.TWOFA_TRUST_DAYS, 30),
     emailOtpTtlMinutes: int(process.env.TWOFA_EMAIL_OTP_TTL_MINUTES, 10),
     emailResendCooldownSeconds: int(

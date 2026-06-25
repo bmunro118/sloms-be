@@ -182,9 +182,10 @@ export class AuthService {
   /**
    * Decides what a successful password check grants. Precedence:
    *   1. forced password change  → password_change scoped token
-   *   2. 2FA not yet enrolled     → twofa_enroll scoped token (mandatory enrollment)
-   *   3. new (untrusted) device   → twofa_pending scoped token (+ email code sent)
-   *   4. otherwise                → full-access token
+   *   2. 2FA disabled globally    → full-access token (TWOFA_ENFORCE=false)
+   *   3. 2FA not yet enrolled     → twofa_enroll scoped token (mandatory enrollment)
+   *   4. new (untrusted) device   → twofa_pending scoped token (+ email code sent)
+   *   5. otherwise                → full-access token
    */
   async login(user: User, ctx: LoginContext = {}): Promise<LoginResult> {
     const { ipAddress } = ctx;
@@ -199,6 +200,14 @@ export class AuthService {
         mustChangePassword: true,
         ...this.baseFields(user),
       };
+    }
+
+    // 2FA can be disabled globally (e.g. until the frontend ships a 2FA UI).
+    // A valid password then grants full access directly — no enrollment or
+    // new-device challenge.
+    if (!this.twofaCfg.enforce) {
+      this.audit(user, AuditEvent.LOGIN_SUCCESS, ipAddress);
+      return this.issueFullToken(user);
     }
 
     const method = (user.twoFactorMethod ?? 'totp') as 'totp' | 'email';

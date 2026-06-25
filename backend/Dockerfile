@@ -18,7 +18,9 @@ RUN npm ci --include=dev --ignore-scripts --no-audit --no-fund || \
 
 # Copy source code and config files
 COPY src ./src
-COPY nest-cli.json tsconfig.json tsconfig.build.json ./
+# .swcrc carries the @swc/jest transform config (decorators / NestJS metadata).
+# Without it, swc can't parse decorators and every test suite fails to transform.
+COPY nest-cli.json tsconfig.json tsconfig.build.json .swcrc ./
 
 # Generate Prisma client first (required before building)
 RUN npx prisma generate --schema=./prisma/schema.prisma
