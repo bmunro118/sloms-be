@@ -7,6 +7,7 @@ Branch-driven environments with a build-once / promote-the-artifact model.
 | `ci.yml` | PRs + pushes to any branch except `main` | lint, unit tests, build; plus an e2e job (Postgres service → migrate → seed → `test:e2e`) |
 | `deploy-dev.yml` | push to `integration` (or manual) | builds the image, pushes `:<sha>` + `:latest` to ACR, deploys to **stage** (`slomsapi-stage` / rg `sloms-stage`) |
 | `deploy-prod.yml` | push to `main` (or manual) | **no rebuild** — promotes the image stage is currently running to **prod** (`slomsapi-prod` / rg `sloms-prod`) |
+| `deploy-infra.yml` | PRs touching `infra/**`; manual dispatch | compiles Bicep + `what-if` on PRs (stage); on dispatch, `what-if` then deploys the chosen env. See `infra/README.md` / `infra/CUTOVER.md` |
 
 Flow: feature branch → PR → **`integration`** (auto-deploys to stage) → validate → merge **`integration` → `main`** (promotes the validated image to prod). A manual `deploy-prod` run can override the image via the `image` input.
 
@@ -21,6 +22,16 @@ Provisioned:
 - Roles: `AcrPush` on the shared registry `slomsacregistry2026`; `Contributor` on both `sloms-stage` and `sloms-prod`.
 - Repo secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
 - GitHub Environments `stage` and `prod` (add required reviewers on `prod` if you want manual approval before prod promotes).
+
+### Extra setup for `deploy-infra.yml`
+
+The infra workflow provisions more than the image-only deploys, so it needs:
+- **Per-environment secret `PG_ADMIN_PASSWORD`** on the `stage` and `prod` GitHub
+  Environments (the Postgres admin password; consumed by the Bicep param files).
+- **`Role Based Access Control Administrator`** (or Owner) for
+  `sloms-be-github-actions` on the registry `slomsacregistry2026`, plus read on
+  rg `sloms` — the template creates an `AcrPull` role assignment there, which
+  `Contributor` cannot do. Without this the deploy fails at the role assignment.
 
 ## Topology
 
