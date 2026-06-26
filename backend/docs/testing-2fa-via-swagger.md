@@ -4,7 +4,7 @@ How to exercise the new-device-gated 2FA flows by hand from the Swagger UI.
 See [twofa design notes](#design-recap) at the bottom for what each step proves.
 
 - **Local Swagger:** `http://localhost:3000/api/docs`
-- **Stage Swagger:** `https://slomsapi-stage.braveground-4ef3bd79.uksouth.azurecontainerapps.io/api/docs`
+- **Stage Swagger:** `https://slomsapi-stage.jollydune-b8782950.uksouth.azurecontainerapps.io/api/docs`
 
 ## The one trick: use the "mobile" flow
 
