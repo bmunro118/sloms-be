@@ -37,6 +37,7 @@ async function bootstrap() {
     'http://localhost:8082', // Playwright e2e web server
     'https://slomsweb-stage.jollydune-b8782950.uksouth.azurecontainerapps.io', // stage FE
     'https://slomsweb-prod.victoriousrock-fbe37a7c.uksouth.azurecontainerapps.io', // prod FE
+    'https://portal.soniclabs.co.uk', // prod FE custom domain
   ];
   const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
     .split(',')
