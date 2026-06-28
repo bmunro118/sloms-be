@@ -139,6 +139,32 @@ param jwtExpiresIn string = '8h'
 @description('Whether the backend enforces 2FA.')
 param twofaEnforce string = 'false'
 
+// ACS Email — add a custom sending domain to the existing shared ACS resources.
+// The Communication Services (`sloms-acs`) + Email service (`sloms-email`) already
+// exist in the shared `sloms` RG and are adopted (referenced), never recreated.
+// Off by default; two-phase rollout (create domain → verify DNS → link). See
+// modules/email.bicep and infra/README.md.
+@description('Turn on the custom-domain email flow. Off = leave ACS exactly as-is.')
+param deployEmail bool = false
+@description('Resource group of the shared ACS resources.')
+param acsResourceGroup string = 'sloms'
+@description('Existing Communication Services resource name.')
+param acsCommunicationServiceName string = 'sloms-acs'
+@description('Existing Email Communication Services resource name.')
+param acsEmailServiceName string = 'sloms-email'
+@description('ACS data-at-rest location (must match the existing resources — UK).')
+param acsDataLocation string = 'UK'
+@description('Custom sending domain to add. Defaults to the delegated portal subdomain.')
+param acsCustomDomain string = 'portal.soniclabs.co.uk'
+@description('Azure DNS zone (delegated subdomain) that holds the sending-domain records. Assumed to live in this deployment RG.')
+param portalDnsZoneName string = 'portal.soniclabs.co.uk'
+@description('Sender mailbox for the custom domain; From becomes <user>@<acsCustomDomain>.')
+param acsSenderUsername string = 'noreply'
+@description('Display name shown to recipients in the From field.')
+param acsSenderDisplayName string = 'SLOMS'
+@description('Phase 2 switch. Set true ONLY after the custom domain DNS records are verified: links the domain and writes the custom From address into Key Vault.')
+param acsCustomDomainReady bool = false
+
 // ---------- Existing resources ----------
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
@@ -147,6 +173,13 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
+}
+
+// Delegated subdomain zone (also serves the frontend A/asuid records). Referenced
+// to surface its authoritative nameservers; its properties are only read when
+// deployEmail is on, so envs without this zone are unaffected.
+resource portalDnsZone 'Microsoft.Network/dnsZones@2023-07-01-preview' existing = {
+  name: portalDnsZoneName
 }
 
 // ---------- User-assigned managed identity (shared by both apps) ----------
@@ -181,6 +214,45 @@ resource kvAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-07-01' = {
         }
       }
     ]
+  }
+}
+
+// ---------- ACS Email custom domain (opt-in, cross-RG into `sloms`) ----------
+// Adds a custom sending domain to the existing shared ACS resources, with the
+// managed domain as the safe default. With deployEmail = true:
+//   acsCustomDomainReady = false → custom domain is pre-created (DNS records become
+//     readable) but the From address stays the managed DoNotReply@<guid> sender.
+//   acsCustomDomainReady = true  → links the verified domain and switches the From
+//     address to the custom sender.
+// Flipping acsCustomDomainReady switches the From address either way (managed <->
+// custom) in a single redeploy — the managed domain stays linked as a fallback.
+// See modules/email.bicep.
+module email 'modules/email.bicep' = if (deployEmail) {
+  name: 'acs-email'
+  scope: resourceGroup(acsResourceGroup)
+  params: {
+    tags: tags
+    communicationServiceName: acsCommunicationServiceName
+    emailServiceName: acsEmailServiceName
+    dataLocation: acsDataLocation
+    customDomain: acsCustomDomain
+    senderUsername: acsSenderUsername
+    senderDisplayName: acsSenderDisplayName
+    customDomainReady: acsCustomDomainReady
+  }
+}
+
+// Bicep owns the From address whenever deployEmail is on: the module resolves it to
+// the managed DoNotReply sender until acsCustomDomainReady flips it to the custom
+// one, so the switch (and rollback) is just this secret + a backend restart. The
+// connection string is left as-is (we adopt the existing Communication Service).
+// The CI identity's Contributor on sloms-prod covers this control-plane write.
+resource acsSenderSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (deployEmail) {
+  parent: keyVault
+  name: 'acs-sender-address'
+  properties: {
+    #disable-next-line BCP318
+    value: email.outputs.senderAddress
   }
 }
 
@@ -275,6 +347,7 @@ module backend 'modules/containerapp.bicep' = {
   dependsOn: [
     acrPull
     kvAccess
+    acsSenderSecret
   ]
 }
 
@@ -310,3 +383,13 @@ output frontendFqdn string = frontend.outputs.fqdn
 output postgresFqdn string = postgres.outputs.fqdn
 output environmentId string = environment.outputs.environmentId
 output managedIdentityPrincipalId string = uami.properties.principalId
+
+// ACS Email (populated only when deployEmail = true).
+@description('From address written to Key Vault as acs-sender-address.')
+#disable-next-line BCP318
+output emailSenderAddress string = deployEmail ? email.outputs.senderAddress : ''
+@description('ACS verification records to apply to the DNS zone (use scripts/setup-email-dns.ps1, which reads these live).')
+#disable-next-line BCP318
+output emailDnsRecords object = deployEmail ? email.outputs.verificationRecords : {}
+@description('Authoritative nameservers for the delegated subdomain — give these to the parent-domain owner for the NS delegation.')
+output emailDelegationNameServers array = deployEmail ? portalDnsZone.properties.nameServers : []

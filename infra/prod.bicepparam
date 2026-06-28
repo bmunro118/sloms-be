@@ -32,3 +32,27 @@ param frontendImage = 'slomsacregistry2026.azurecr.io/slomsweb:2490f6f2ef5ac579c
 // Keep prod warm.
 param minReplicas = 1
 param maxReplicas = 10
+
+// --- ACS Email custom domain (opt-in) ---
+// Adopts the shared resources (sloms-acs / sloms-email in rg `sloms`) and can add
+// the delegated subdomain `portal.soniclabs.co.uk` so mail goes out as
+// noreply@portal.soniclabs.co.uk instead of DoNotReply@<guid>.azurecomm.net.
+// Deploy via the "Deploy infra (Bicep)" workflow (PG_ADMIN_PASSWORD is a GitHub
+// secret); the CI identity already has the rights (Contributor on `sloms` + `sloms-prod`).
+//
+// TESTING NOW: leave everything below commented (deployEmail defaults to false).
+// Email already works on the managed domain — no infra change needed.
+//
+// SWITCH LATER (custom domain), in order:
+//   PREREQ — owner delegates the subdomain (one-time). Give them the nameservers:
+//     az network dns zone show -g sloms-prod -n portal.soniclabs.co.uk --query nameServers -o tsv
+//   PHASE 1 — set `deployEmail = true` (keep acsCustomDomainReady = false), deploy,
+//     then run ./scripts/setup-email-dns.ps1 until all four records show Verified.
+//     (From address stays managed during this phase.)
+//   PHASE 2 — set `acsCustomDomainReady = true`, redeploy, then:
+//     az containerapp revision restart -g sloms-prod -n slomsapi-prod
+//   ROLLBACK — flip acsCustomDomainReady back to false and redeploy; the From
+//     address reverts to the managed sender in one step.
+//
+// param deployEmail = true
+// param acsCustomDomainReady = false

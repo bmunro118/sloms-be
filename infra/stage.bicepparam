@@ -43,3 +43,9 @@ param maxReplicas = 10
 // Stage builds its own images; provision from :latest, CD overrides per-commit.
 param backendImage = 'slomsacregistry2026.azurecr.io/slomsapi:latest'
 param frontendImage = 'slomsacregistry2026.azurecr.io/slomsweb:latest'
+
+// --- ACS Email ---
+// The ACS resources (sloms-acs / sloms-email) are SHARED across environments and
+// already send via the Azure-managed domain. Leave deployEmail = false here; the
+// custom-domain rollout is driven from prod.bicepparam so stage doesn't also try
+// to manage the shared domain link. Stage keeps the existing managed sender.

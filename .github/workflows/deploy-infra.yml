@@ -4,16 +4,18 @@ name: Deploy infra (Bicep)
 # param files). Compile + what-if on PRs that touch infra/; gated deploy on
 # manual dispatch.
 #
-# REQUIRED AZURE PERMISSIONS (one-time, beyond the current CD setup)
-# ------------------------------------------------------------------
-# The existing `sloms-be-github-actions` identity has Contributor on
-# sloms-stage / sloms-prod and AcrPush on the registry. This template does MORE:
-#   - Creates an AcrPull role assignment on `slomsacregistry2026` (rg `sloms`).
-#     → the identity needs **Role Based Access Control Administrator** (or Owner)
-#       on that registry AND at least read on rg `sloms`. Contributor alone
-#       CANNOT create role assignments — the deploy will fail without this.
-#   - Edits Key Vault access policies on sloms-kv-<env> (Contributor covers this).
-# Grant the extra ACR role once, e.g.:
+# AZURE PERMISSIONS (all already granted to `sloms-be-github-actions`)
+# -------------------------------------------------------------------
+# Current role assignments on the identity:
+#   - Contributor on rg `sloms`, `sloms-stage`, `sloms-prod`
+#   - AcrPush + Role Based Access Control Administrator on `slomsacregistry2026`
+# These cover everything this template does:
+#   - AcrPull role assignment on the registry → needs RBAC Administrator (granted).
+#   - Key Vault access policies + control-plane secret writes on sloms-kv-<env>
+#     (acs-sender-address) → Contributor covers this.
+#   - ACS Email custom domain + sender, and adopting `sloms-acs`, in rg `sloms`
+#     → Contributor on `sloms` covers this.
+# If the identity is ever recreated, re-grant the registry RBAC role once, e.g.:
 #   az role assignment create --assignee <appId> \
 #     --role "Role Based Access Control Administrator" \
 #     --scope $(az acr show -n slomsacregistry2026 --query id -o tsv)
