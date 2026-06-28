@@ -1,7 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
+import { MailService } from '../mail/mail.service';
+import { Role } from '../users/entities/role.enum';
 
 const mockPrisma = {
   customer: {
@@ -19,6 +22,14 @@ const mockPrisma = {
     update: jest.fn(),
     updateMany: jest.fn(),
   },
+};
+
+const mockUsers = {
+  create: jest.fn(),
+};
+
+const mockMail = {
+  sendWelcome: jest.fn(),
 };
 
 function makeCustomer(overrides = {}) {
@@ -57,6 +68,8 @@ describe('CustomersService', () => {
       providers: [
         CustomersService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: UsersService, useValue: mockUsers },
+        { provide: MailService, useValue: mockMail },
       ],
     }).compile();
 
@@ -184,6 +197,84 @@ describe('CustomersService', () => {
 
       const result = await service.reinstate(1);
       expect(result.suspended).toBe(false);
+    });
+  });
+
+  // ─── onboard ─────────────────────────────────────────────────────────────────
+
+  describe('onboard', () => {
+    it('throws NotFoundException when customer does not exist', async () => {
+      mockPrisma.customer.findUnique.mockResolvedValue(null);
+      await expect(service.onboard(99, {})).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects onboarding a suspended customer', async () => {
+      mockPrisma.customer.findUnique.mockResolvedValue(
+        makeCustomer({ suspended: true }),
+      );
+      await expect(service.onboard(1, {})).rejects.toThrow(BadRequestException);
+      expect(mockUsers.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects when no email is available', async () => {
+      mockPrisma.customer.findUnique.mockResolvedValue(
+        makeCustomer({ contactEmail: null }),
+      );
+      await expect(service.onboard(1, {})).rejects.toThrow(BadRequestException);
+      expect(mockUsers.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a linked Customer-role user and emails a welcome message', async () => {
+      mockPrisma.customer.findUnique.mockResolvedValue(
+        makeCustomer({
+          contactEmail: 'jane@acme.com',
+          contactName: 'Jane Doe',
+        }),
+      );
+      mockUsers.create.mockResolvedValue({
+        userId: 7,
+        username: 'jane@acme.com',
+      });
+
+      const result = await service.onboard(1, {}, 'admin');
+
+      expect(mockUsers.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          username: 'jane@acme.com',
+          email: 'jane@acme.com',
+          fullName: 'Jane Doe',
+          role: Role.Customer,
+          linkedCustomerId: 1,
+        }),
+        'admin',
+      );
+      // A temporary password is generated and forwarded to user creation.
+      expect(mockUsers.create.mock.calls[0][0].password).toBeTruthy();
+      // The welcome email goes to the login address with the same password.
+      expect(mockMail.sendWelcome).toHaveBeenCalledWith(
+        'jane@acme.com',
+        expect.objectContaining({
+          username: 'jane@acme.com',
+          temporaryPassword: mockUsers.create.mock.calls[0][0].password,
+        }),
+      );
+      expect(result).toEqual(
+        expect.objectContaining({ customerId: 1, loginEmail: 'jane@acme.com' }),
+      );
+    });
+
+    it('prefers the explicit email over the customer contact email', async () => {
+      mockPrisma.customer.findUnique.mockResolvedValue(
+        makeCustomer({ contactEmail: 'jane@acme.com' }),
+      );
+      mockUsers.create.mockResolvedValue({ userId: 8 });
+
+      await service.onboard(1, { email: 'portal@acme.com' });
+
+      expect(mockUsers.create).toHaveBeenCalledWith(
+        expect.objectContaining({ username: 'portal@acme.com' }),
+        undefined,
+      );
     });
   });
 

@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { generate } from 'otplib';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './support/app';
 import { api, authHeader } from './support/http';
 import { login, e2eDeviceToken } from './support/auth';
@@ -12,6 +13,7 @@ import { login, e2eDeviceToken } from './support/auth';
  */
 describe('2FA (e2e)', () => {
   let app: INestApplication;
+  let prisma: PrismaService;
   let adminToken: string;
 
   const USERNAME = 'tfae2e';
@@ -25,9 +27,32 @@ describe('2FA (e2e)', () => {
   const secretFromOtpauth = (url: string) =>
     new URL(url).searchParams.get('secret') as string;
 
+  /**
+   * Remove the fixture user and its dependents. EmailOtp/TrustedDevice/
+   * RecoveryCode cascade on user delete; UserSetting/UserAuditLog do not, so
+   * clear those best-effort first. Run before creating the user (to clear a
+   * leftover from a crashed run) and after, so the spec is self-contained.
+   */
+  const cleanupFixtureUser = async () => {
+    const user = await prisma.user.findUnique({
+      where: { username: USERNAME },
+      select: { userId: true },
+    });
+    if (!user) return;
+    await prisma.userSetting
+      .deleteMany({ where: { userId: user.userId } })
+      .catch(() => undefined);
+    await prisma.userAuditLog
+      .deleteMany({ where: { userId: user.userId } })
+      .catch(() => undefined);
+    await prisma.user.delete({ where: { userId: user.userId } });
+  };
+
   beforeAll(async () => {
-    ({ app } = await createTestApp());
+    ({ app, prisma } = await createTestApp());
     adminToken = await login(app, 'admin', 'admin123');
+
+    await cleanupFixtureUser();
 
     await api(app)
       .post('/api/users')
@@ -42,6 +67,7 @@ describe('2FA (e2e)', () => {
   });
 
   afterAll(async () => {
+    await cleanupFixtureUser();
     await app.close();
   });
 

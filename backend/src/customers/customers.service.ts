@@ -1,17 +1,92 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PagingDto, PagedResult } from '../common/paging';
 import { PrismaService } from '../prisma/prisma.service';
 import { serializePrisma } from '../prisma/prisma-serializer';
 import { Customer } from './entities/customer.entity';
 import { CustomerAddress } from './entities/customer-address.entity';
+import { OnboardResult } from './entities/onboard-result.entity';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CreateCustomerAddressDto } from './dto/create-customer-address.dto';
 import { UpdateCustomerAddressDto } from './dto/update-customer-address.dto';
+import { OnboardCustomerDto } from './dto/onboard-customer.dto';
+import { UsersService } from '../users/users.service';
+import { Role } from '../users/entities/role.enum';
+import { MailService } from '../mail/mail.service';
+import { temporaryPassword } from '../auth/crypto.util';
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly users: UsersService,
+    private readonly mail: MailService,
+  ) {}
+
+  private get portalUrl(): string {
+    return process.env.PORTAL_URL ?? 'https://portal.soniclabs.co.uk';
+  }
+
+  /**
+   * Onboards an existing customer to the web portal:
+   *   1. creates a Customer-role user login linked to the customer account,
+   *   2. emails a welcome message with first-login credentials.
+   *
+   * The login username is the customer's email. A temporary password is
+   * generated; the user is flagged to change it on first sign-in (handled by
+   * UsersService.create).
+   */
+  async onboard(
+    id: number,
+    dto: OnboardCustomerDto,
+    actor?: string,
+  ): Promise<OnboardResult> {
+    const customer = await this.findOne(id);
+
+    if (customer.suspended) {
+      throw new BadRequestException(
+        'Cannot onboard a suspended customer; reinstate the account first',
+      );
+    }
+
+    const loginEmail = (dto.email ?? customer.contactEmail ?? '').trim();
+    if (!loginEmail) {
+      throw new BadRequestException(
+        'No email available to onboard this customer. Provide an email or set the customer contactEmail first.',
+      );
+    }
+
+    const tempPassword = temporaryPassword();
+
+    // UsersService.create enforces the Customer-role invariants (username must
+    // be a valid email, linkedCustomerId required), hashes the password, sets
+    // mustChangePassword = true and twoFactorMethod = 'email', and throws
+    // ConflictException if this login already exists.
+    const user = await this.users.create(
+      {
+        username: loginEmail,
+        password: tempPassword,
+        email: loginEmail,
+        fullName: dto.fullName ?? customer.contactName ?? undefined,
+        role: Role.Customer,
+        linkedCustomerId: id,
+      },
+      actor,
+    );
+
+    await this.mail.sendWelcome(loginEmail, {
+      username: loginEmail,
+      temporaryPassword: tempPassword,
+      companyName: customer.companyName,
+      portalUrl: this.portalUrl,
+    });
+
+    return { customerId: id, loginEmail, user };
+  }
 
   async findAll(
     includeSuspended = false,

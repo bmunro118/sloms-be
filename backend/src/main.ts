@@ -74,6 +74,7 @@ async function bootstrap() {
     .addTag('orders', 'Orders and ordered items')
     .addTag('price-list', 'Product price list')
     .addTag('settings', 'Global and user settings')
+    .addTag('stats', 'Revenue time-series and per-account figures (staff only)')
     .addTag('vat-rates', 'VAT rate history and active rate')
     .build();
 

@@ -28,9 +28,11 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CreateCustomerAddressDto } from './dto/create-customer-address.dto';
 import { UpdateCustomerAddressDto } from './dto/update-customer-address.dto';
+import { OnboardCustomerDto } from './dto/onboard-customer.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Role } from '../users/entities/role.enum';
 
 @ApiTags('customers')
@@ -185,6 +187,44 @@ export class CustomersController {
   @ApiOkResponse({ description: 'The reinstated customer object.' })
   reinstate(@Param('id', ParseIntPipe) id: number) {
     return this.customersService.reinstate(id);
+  }
+
+  /**
+   * POST /customers/:id/onboard
+   * Creates a portal login for the customer and emails a welcome message.
+   */
+  @Post(':id/onboard')
+  @Roles(Role.Manager, Role.Admin)
+  @ApiOperation({
+    summary:
+      'Onboard a customer to the web portal — create a linked user login and email a welcome message',
+  })
+  @ApiBody({
+    type: OnboardCustomerDto,
+    examples: {
+      useContactEmail: {
+        summary: "Use the customer's existing contact email",
+        value: {},
+      },
+      explicit: {
+        summary: 'Specify the login email and display name',
+        value: {
+          email: 'portal.user@acme.com',
+          fullName: 'Jane Doe',
+        },
+      },
+    },
+  })
+  @ApiCreatedResponse({
+    description:
+      'Onboarding result containing the customer id, login email and created user.',
+  })
+  onboard(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: OnboardCustomerDto,
+    @CurrentUser('username') actor: string,
+  ) {
+    return this.customersService.onboard(id, dto, actor);
   }
 
   // ─── Addresses ────────────────────────────────────────────────────────────

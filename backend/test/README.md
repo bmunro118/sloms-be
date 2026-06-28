@@ -73,10 +73,11 @@ documented passwords in `prisma/seed.sql` (`support/auth.ts` relies on them).
 
 ## Coverage status
 
-**All 8 controllers covered — 68/68 documented operations, 126 tests.** Specs:
-`auth`, `customers` (full template), `orders`, `price-list`, `settings`,
-`users`, `vat-rates`, plus `zz-coverage`. Run `npm run test:e2e:cov` to enforce;
-any new endpoint will fail the guard until a spec exercises it.
+**All controllers covered — every documented operation, 172 tests.** Specs:
+`auth`, `2fa`, `customers` (full template), `customer-onboarding`, `orders`,
+`price-list`, `settings`, `stats`, `users`, `vat-rates`, plus `zz-coverage`. Run
+`npm run test:e2e:cov` to enforce; any new endpoint will fail the guard until a
+spec exercises it.
 
 The suite found and drove fixes for three real route/validation bugs:
 `GET /users/audit-log` filters rejected by `forbidNonWhitelisted` (fixed via
