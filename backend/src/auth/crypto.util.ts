@@ -23,6 +23,14 @@ export function safeEqualHex(a: string, b: string): boolean {
   return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
+/**
+ * Generates a high-entropy, URL-safe temporary password (~16 chars by default).
+ * Used for one-time credentials that the recipient must change on first login.
+ */
+export function temporaryPassword(bytes = 12): string {
+  return randomBytes(bytes).toString('base64url');
+}
+
 /** Generates a zero-padded numeric code of the given length (default 6). */
 export function numericCode(digits = 6): string {
   const max = 10 ** digits;

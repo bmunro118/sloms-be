@@ -7,6 +7,7 @@ import { OrderBreakdownModule } from './order-breakdown/order-breakdown.module';
 import { OrdersModule } from './orders/orders.module';
 import { PriceListModule } from './price-list/price-list.module';
 import { SettingsModule } from './settings/settings.module';
+import { StatsModule } from './stats/stats.module';
 import { VatRatesModule } from './vat-rates/vat-rates.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -25,6 +26,7 @@ import { PrismaModule } from './prisma/prisma.module';
     OrdersModule,
     PriceListModule,
     SettingsModule,
+    StatsModule,
     VatRatesModule,
     UsersModule,
     AuthModule,

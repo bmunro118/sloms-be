@@ -9,11 +9,11 @@
 # ============================================================================
 
 param(
-    [string]$resourceGroup = "sloms",
+    [string]$resourceGroup = "sloms-stage",
     [string]$location = "uksouth",
-    [string]$containerName = "slomsapi",
+    [string]$containerName = "slomsapi-stage",
     [string]$acrName = "slomsacregistry2026",
-    [string]$environmentName = "slomsapi-env"
+    [string]$environmentName = "slomsapi-stage-env"
 )
 
 Write-Host "==========================================" -ForegroundColor Cyan

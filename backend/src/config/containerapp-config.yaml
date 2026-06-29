@@ -1,12 +1,12 @@
 # =============================================================================
-# Azure Container App spec for `slomsapi`.
+# Azure Container App spec for `slomsapi-stage`.
 #
 # Valid input for:  az containerapp create --yaml <this-file>
 #                   az containerapp update --yaml <this-file>
 # Schema reference:  https://aka.ms/azure-container-apps-yaml
 #
 # Secrets are NOT stored here. `database-url` and `jwt-secret` are resolved at
-# runtime from Azure Key Vault (`sloms-kv`) using the app's system-assigned
+# runtime from Azure Key Vault (`sloms-kv-stage`) using the app's system-assigned
 # managed identity, which has get/list on those secrets. The same identity is
 # used to pull the image from ACR (AcrPull), so no registry password is stored.
 #
@@ -17,16 +17,16 @@ location: uksouth
 identity:
   type: SystemAssigned
 properties:
-  managedEnvironmentId: /subscriptions/295f53a3-9253-4547-8062-51d425160903/resourceGroups/sloms/providers/Microsoft.App/managedEnvironments/slomsapi-env
+  managedEnvironmentId: /subscriptions/295f53a3-9253-4547-8062-51d425160903/resourceGroups/sloms-stage/providers/Microsoft.App/managedEnvironments/slomsapi-stage-env
   workloadProfileName: Consumption
   configuration:
     activeRevisionsMode: Single
     secrets:
       - name: database-url
-        keyVaultUrl: https://sloms-kv.vault.azure.net/secrets/database-url
+        keyVaultUrl: https://sloms-kv-stage.vault.azure.net/secrets/database-url
         identity: system
       - name: jwt-secret
-        keyVaultUrl: https://sloms-kv.vault.azure.net/secrets/jwt-secret
+        keyVaultUrl: https://sloms-kv-stage.vault.azure.net/secrets/jwt-secret
         identity: system
     registries:
       - server: slomsacregistry2026.azurecr.io
@@ -55,7 +55,7 @@ properties:
           - name: JWT_EXPIRES_IN
             value: "8h"
           - name: PGHOST
-            value: sloms-postgres.postgres.database.azure.com
+            value: sloms-postgres-stage.postgres.database.azure.com
           - name: PGPORT
             value: "5432"
           - name: PGUSER

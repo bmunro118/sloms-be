@@ -5,9 +5,9 @@
  # It uses an external YAML configuration file for the container app spec
 
  # ==================== Configuration ====================
- $resourceGroup = "sloms"  # Change this!
+ $resourceGroup = "sloms-stage"  # Change this!
  $location = "southuk"     # Can be changed, but must match ACR location
- $containerName = "slomsapi"  # Must be globally unique - change this!
+ $containerName = "slomsapi-stage"  # Must be globally unique - change this!
  $acrName = "slomsacregistry2026"  # Must be globally unique - change this!
  $imageName = "slomsapi:latest"
  # ==================== End Configuration ====================

@@ -1,13 +1,13 @@
-name: Deploy to dev
+name: Deploy to stage
 
 on:
   push:
     branches: [integration]
   workflow_dispatch: {}
 
-# One dev deploy at a time.
+# One stage deploy at a time.
 concurrency:
-  group: deploy-dev
+  group: deploy-stage
   cancel-in-progress: false
 
 permissions:
@@ -15,20 +15,20 @@ permissions:
   contents: read
 
 env:
-  AZURE_RESOURCE_GROUP: sloms
+  AZURE_RESOURCE_GROUP: sloms-stage
   ACR_NAME: slomsacregistry2026
   ACR_LOGIN_SERVER: slomsacregistry2026.azurecr.io
-  CONTAINERAPP_NAME: slomsapi
+  CONTAINERAPP_NAME: slomsapi-stage
   IMAGE_REPOSITORY: slomsapi
 
 jobs:
   build-and-deploy:
-    name: Build & deploy (dev)
+    name: Build & deploy (stage)
     runs-on: ubuntu-latest
-    environment: dev # OIDC subject repo:...:environment:dev
+    environment: stage # OIDC subject repo:...:environment:stage
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
@@ -56,7 +56,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to dev Container App
+      - name: Deploy to stage Container App
         run: |
           az containerapp update \
             --name "$CONTAINERAPP_NAME" \
@@ -67,5 +67,5 @@ jobs:
         run: |
           fqdn=$(az containerapp show -n "$CONTAINERAPP_NAME" -g "$AZURE_RESOURCE_GROUP" \
             --query "properties.configuration.ingress.fqdn" -o tsv)
-          echo "Dev now running $IMAGE_REPOSITORY:${{ github.sha }}"
+          echo "Stage now running $IMAGE_REPOSITORY:${{ github.sha }}"
           echo "https://$fqdn"

@@ -35,8 +35,9 @@ async function bootstrap() {
   const DEFAULT_CORS_ORIGINS = [
     'http://localhost:8081', // Expo web dev server
     'http://localhost:8082', // Playwright e2e web server
-    'https://slomsweb.wonderfulsky-1907992c.uksouth.azurecontainerapps.io', // dev FE
-    'https://slomsweb-prod.victoriousfield-9e54908e.uksouth.azurecontainerapps.io', // prod FE
+    'https://slomsweb-stage.jollydune-b8782950.uksouth.azurecontainerapps.io', // stage FE
+    'https://slomsweb-prod.victoriousrock-fbe37a7c.uksouth.azurecontainerapps.io', // prod FE
+    'https://portal.soniclabs.co.uk', // prod FE custom domain
   ];
   const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
     .split(',')
@@ -73,6 +74,7 @@ async function bootstrap() {
     .addTag('orders', 'Orders and ordered items')
     .addTag('price-list', 'Product price list')
     .addTag('settings', 'Global and user settings')
+    .addTag('stats', 'Revenue time-series and per-account figures (staff only)')
     .addTag('vat-rates', 'VAT rate history and active rate')
     .build();
 

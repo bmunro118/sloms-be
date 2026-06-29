@@ -1,0 +1,138 @@
+name: Deploy infra (Bicep)
+
+# Provisions/updates the Azure stack defined in infra/ (main.bicep + per-env
+# param files). Compile + what-if on PRs that touch infra/; gated deploy on
+# manual dispatch.
+#
+# AZURE PERMISSIONS (all already granted to `sloms-be-github-actions`)
+# -------------------------------------------------------------------
+# Current role assignments on the identity:
+#   - Contributor on rg `sloms`, `sloms-stage`, `sloms-prod`
+#   - AcrPush + Role Based Access Control Administrator on `slomsacregistry2026`
+# These cover everything this template does:
+#   - AcrPull role assignment on the registry → needs RBAC Administrator (granted).
+#   - Key Vault access policies + control-plane secret writes on sloms-kv-<env>
+#     (acs-sender-address) → Contributor covers this.
+#   - ACS Email custom domain + sender, and adopting `sloms-acs`, in rg `sloms`
+#     → Contributor on `sloms` covers this.
+# If the identity is ever recreated, re-grant the registry RBAC role once, e.g.:
+#   az role assignment create --assignee <appId> \
+#     --role "Role Based Access Control Administrator" \
+#     --scope $(az acr show -n slomsacregistry2026 --query id -o tsv)
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/deploy-infra.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment to deploy"
+        type: choice
+        options: [stage, prod]
+        required: true
+        default: stage
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-infra-${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---- Always: compile the template + both param files (no Azure needed) ----
+  lint:
+    name: Bicep build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: az bicep build
+        run: |
+          az bicep build --file infra/main.bicep
+          # build-params needs the secure param present; a dummy is fine for compile.
+          PG_ADMIN_PASSWORD=dummy az bicep build-params --file infra/prod.bicepparam --outfile /dev/null
+          PG_ADMIN_PASSWORD=dummy az bicep build-params --file infra/stage.bicepparam --outfile /dev/null
+
+  # ---- PR: read-only what-if against STAGE ----
+  # Uses environment:stage so the existing OIDC federated credential matches.
+  # (To also what-if prod, add a matching job with environment:prod — note prod's
+  # required reviewers will gate it.)
+  whatif:
+    name: What-if (stage)
+    if: github.event_name == 'pull_request'
+    needs: lint
+    runs-on: ubuntu-latest
+    environment: stage
+    steps:
+      - uses: actions/checkout@v5
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: What-if
+        env:
+          PG_ADMIN_PASSWORD: ${{ secrets.PG_ADMIN_PASSWORD }}
+        run: |
+          echo '## What-if: stage' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          az deployment group what-if \
+            --resource-group sloms-stage \
+            --template-file infra/main.bicep \
+            --parameters infra/stage.bicepparam \
+            --no-pretty-print | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  # ---- Dispatch: what-if then deploy the chosen environment ----
+  deploy:
+    name: Deploy (${{ inputs.environment }})
+    if: github.event_name == 'workflow_dispatch'
+    needs: lint
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve target
+        id: t
+        run: |
+          echo "rg=sloms-${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          echo "params=infra/${{ inputs.environment }}.bicepparam" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: What-if
+        env:
+          PG_ADMIN_PASSWORD: ${{ secrets.PG_ADMIN_PASSWORD }}
+        run: |
+          echo '## What-if: ${{ inputs.environment }}' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          az deployment group what-if \
+            --resource-group "${{ steps.t.outputs.rg }}" \
+            --template-file infra/main.bicep \
+            --parameters "${{ steps.t.outputs.params }}" \
+            --no-pretty-print | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy
+        env:
+          PG_ADMIN_PASSWORD: ${{ secrets.PG_ADMIN_PASSWORD }}
+        run: |
+          az deployment group create \
+            --resource-group "${{ steps.t.outputs.rg }}" \
+            --name "infra-$(date +%Y%m%d-%H%M%S)" \
+            --template-file infra/main.bicep \
+            --parameters "${{ steps.t.outputs.params }}"
+
+      - name: Summary
+        run: |
+          echo "Deployed infra to **${{ inputs.environment }}** (${{ steps.t.outputs.rg }})." >> "$GITHUB_STEP_SUMMARY"
