@@ -33,6 +33,11 @@ param frontendImage = 'slomsacregistry2026.azurecr.io/slomsweb:2490f6f2ef5ac579c
 param minReplicas = 1
 param maxReplicas = 10
 
+// --- 2FA ---
+// Prod enforces mandatory 2FA. Stated explicitly here (it also matches the
+// main.bicep default) so the security posture is visible at the env level.
+param twofaEnforce = 'true'
+
 // --- ACS Email custom domain (opt-in) ---
 // Adopts the shared resources (sloms-acs / sloms-email in rg `sloms`) and can add
 // the delegated subdomain `portal.soniclabs.co.uk` so mail goes out as

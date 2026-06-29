@@ -40,6 +40,11 @@ param environmentZoneRedundant = false
 param minReplicas = 0
 param maxReplicas = 10
 
+// --- 2FA ---
+// Stage deliberately opts OUT of mandatory 2FA so testers can sign in with just a
+// username/password. Prod enforces it (main.bicep defaults twofaEnforce = 'true').
+param twofaEnforce = 'false'
+
 // Stage builds its own images; provision from :latest, CD overrides per-commit.
 param backendImage = 'slomsacregistry2026.azurecr.io/slomsapi:latest'
 param frontendImage = 'slomsacregistry2026.azurecr.io/slomsweb:latest'

@@ -136,8 +136,8 @@ param environmentZoneRedundant bool = true
 param maxReplicas int = 10
 @description('JWT expiry for the backend.')
 param jwtExpiresIn string = '8h'
-@description('Whether the backend enforces 2FA.')
-param twofaEnforce string = 'false'
+@description('Whether the backend enforces 2FA. Secure by default (matches the app default); stage opts out via stage.bicepparam.')
+param twofaEnforce string = 'true'
 
 // ACS Email — add a custom sending domain to the existing shared ACS resources.
 // The Communication Services (`sloms-acs`) + Email service (`sloms-email`) already
