@@ -74,6 +74,20 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      # Mirror the deploy job: pin to the running images so the what-if reflects
+      # an actual infra deploy (which never changes the live image) rather than
+      # a spurious image replacement back to the bicepparam value.
+      - name: Pin to running images
+        id: img
+        run: |
+          be=$(az containerapp show -n slomsapi-stage -g sloms-stage \
+            --query "properties.template.containers[0].image" -o tsv 2>/dev/null || true)
+          fe=$(az containerapp show -n slomsweb-stage -g sloms-stage \
+            --query "properties.template.containers[0].image" -o tsv 2>/dev/null || true)
+          overrides=""
+          if [ -n "$be" ]; then overrides="$overrides backendImage=$be"; fi
+          if [ -n "$fe" ]; then overrides="$overrides frontendImage=$fe"; fi
+          echo "overrides=$overrides" >> "$GITHUB_OUTPUT"
       - name: What-if
         env:
           PG_ADMIN_PASSWORD: ${{ secrets.PG_ADMIN_PASSWORD }}
@@ -83,7 +97,7 @@ jobs:
           az deployment group what-if \
             --resource-group sloms-stage \
             --template-file infra/main.bicep \
-            --parameters infra/stage.bicepparam \
+            --parameters infra/stage.bicepparam ${{ steps.img.outputs.overrides }} \
             --no-pretty-print | tee -a "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
@@ -110,6 +124,26 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # Pin the deploy to the images the apps are ALREADY running so an infra
+      # deploy never changes which build is live — CD (deploy-prod.yml /
+      # deploy-stage.yml) stays the sole authority on the running image. The
+      # bicepparam image value is only used on first provision, when the app
+      # does not yet exist and the show below returns empty.
+      - name: Pin to running images
+        id: img
+        run: |
+          rg="${{ steps.t.outputs.rg }}"
+          be=$(az containerapp show -n "slomsapi-${{ inputs.environment }}" -g "$rg" \
+            --query "properties.template.containers[0].image" -o tsv 2>/dev/null || true)
+          fe=$(az containerapp show -n "slomsweb-${{ inputs.environment }}" -g "$rg" \
+            --query "properties.template.containers[0].image" -o tsv 2>/dev/null || true)
+          overrides=""
+          if [ -n "$be" ]; then overrides="$overrides backendImage=$be"; echo "Backend pinned to $be"; \
+            else echo "Backend app not found — using bicepparam image (first provision)"; fi
+          if [ -n "$fe" ]; then overrides="$overrides frontendImage=$fe"; echo "Frontend pinned to $fe"; \
+            else echo "Frontend app not found — using bicepparam image (first provision)"; fi
+          echo "overrides=$overrides" >> "$GITHUB_OUTPUT"
+
       - name: What-if
         env:
           PG_ADMIN_PASSWORD: ${{ secrets.PG_ADMIN_PASSWORD }}
@@ -119,7 +153,7 @@ jobs:
           az deployment group what-if \
             --resource-group "${{ steps.t.outputs.rg }}" \
             --template-file infra/main.bicep \
-            --parameters "${{ steps.t.outputs.params }}" \
+            --parameters "${{ steps.t.outputs.params }}" ${{ steps.img.outputs.overrides }} \
             --no-pretty-print | tee -a "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
@@ -131,7 +165,7 @@ jobs:
             --resource-group "${{ steps.t.outputs.rg }}" \
             --name "infra-$(date +%Y%m%d-%H%M%S)" \
             --template-file infra/main.bicep \
-            --parameters "${{ steps.t.outputs.params }}"
+            --parameters "${{ steps.t.outputs.params }}" ${{ steps.img.outputs.overrides }}
 
       - name: Summary
         run: |
