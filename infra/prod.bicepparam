@@ -24,13 +24,16 @@ param allowedClientIps = [
 ]
 
 // --- Container Apps ---
-// Track :latest (like stage) so an infra deploy never reverts the running app to
-// a stale pinned SHA. Stage CD pushes :latest on every build, and prod CD promotes
-// the exact image stage validated via `az containerapp update --image` per release,
-// so the running image is always governed by CD — the infra deploy just provisions
-// a current baseline instead of clobbering it.
-param backendImage = 'slomsacregistry2026.azurecr.io/slomsapi:latest'
-param frontendImage = 'slomsacregistry2026.azurecr.io/slomsweb:latest'
+// First-provision baseline ONLY. On every infra deploy, deploy-infra.yml reads the
+// image each app is currently running and passes it as a `backendImage`/`frontendImage`
+// override, so an infra deploy never changes the live build — CD (deploy-prod.yml)
+// stays the sole authority on what prod runs. These values are used solely when the
+// app does not yet exist (initial provision). Do NOT point these at :latest: stage
+// and prod share one registry and stage CD pushes :latest on every build (the FE
+// :latest is even built with the stage-only Statistics page enabled), so a fresh
+// provision from :latest would pull an unvalidated stage image into prod.
+param backendImage = 'slomsacregistry2026.azurecr.io/slomsapi:961fbb1cd412ad6dae6adc52d58bb457b48c7884'
+param frontendImage = 'slomsacregistry2026.azurecr.io/slomsweb:2490f6f2ef5ac579c10f9724f8617e0794de4416'
 
 // Keep prod warm.
 param minReplicas = 1
