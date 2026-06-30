@@ -141,6 +141,30 @@ export class AuthController {
     return this.respond(res, result, dto.clientType);
   }
 
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Log out',
+    description:
+      'Clears the session cookie (and any in-flight scoped cookies) for web ' +
+      'clients. Token clients simply discard their stored token; the trusted-' +
+      'device cookie is left intact so a remembered device stays trusted. Safe ' +
+      'to call regardless of auth state.',
+  })
+  logout(@Res({ passthrough: true }) res: Response) {
+    // Match the attributes the cookies were set with so the browser removes them.
+    const opts = {
+      httpOnly: COOKIE_OPTIONS.httpOnly,
+      secure: COOKIE_OPTIONS.secure,
+      sameSite: COOKIE_OPTIONS.sameSite,
+    };
+    res.clearCookie('access_token', opts);
+    res.clearCookie('pc_token', opts);
+    res.clearCookie('enroll_token', opts);
+    res.clearCookie('tfa_token', opts);
+    return { message: 'Logged out' };
+  }
+
   @Post('change-password')
   @UseGuards(PasswordChangeGuard)
   @HttpCode(HttpStatus.OK)

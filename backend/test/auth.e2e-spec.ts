@@ -80,6 +80,29 @@ describe('Auth (e2e)', () => {
         .expect(400));
   });
 
+  describe('POST /auth/logout', () => {
+    it('clears the session + scoped cookies and needs no auth', async () => {
+      const res = await api(app).post('/api/auth/logout').expect(200);
+      expect(res.body.message).toMatch(/logged out/i);
+
+      const raw = res.headers['set-cookie'] ?? [];
+      const cookies = Array.isArray(raw) ? raw : [raw];
+      // Each session/scoped cookie is expired (empty value + epoch expiry) so
+      // the browser drops it. The trusted-device cookie is intentionally left.
+      for (const name of [
+        'access_token',
+        'pc_token',
+        'enroll_token',
+        'tfa_token',
+      ]) {
+        const cleared = cookies.find((c) => c.startsWith(`${name}=`));
+        expect(cleared).toBeDefined();
+        expect(cleared).toMatch(/Expires=Thu, 01 Jan 1970/);
+      }
+      expect(cookies.join(';')).not.toMatch(/device_id=/);
+    });
+  });
+
   describe('GET /auth/me', () => {
     it('401 without a token', () => api(app).get('/api/auth/me').expect(401));
 
