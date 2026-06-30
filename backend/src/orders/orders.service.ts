@@ -4,6 +4,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PagingDto, PagedResult } from '../common/paging';
 import { PrismaService } from '../prisma/prisma.service';
 import { serializePrisma } from '../prisma/prisma-serializer';
@@ -93,21 +94,43 @@ function attachComputedOrderFields(raw: any): Order {
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Atomically allocates the next counter value for `key` in the shared
+   * "Sequences" table, seeding/advancing it per the given SQL fragments.
+   * `insertSeed` is used when the key doesn't exist yet; `updateExpr` is used
+   * to derive the next value when it does (typically `Counter + 1`, optionally
+   * wrapped in GREATEST(...) against a re-derived floor).
+   */
+  private async allocateSequence(
+    key: string,
+    insertSeed: Prisma.Sql,
+    updateExpr: Prisma.Sql,
+  ): Promise<number> {
+    const result = await this.prisma.$queryRaw<[{ counter: number }]>(
+      Prisma.sql`
+        INSERT INTO "Sequences" ("Key", "Counter")
+        VALUES (${key}, ${insertSeed})
+        ON CONFLICT ("Key") DO UPDATE
+          SET "Counter" = ${updateExpr}
+        RETURNING "Counter" AS counter
+      `,
+    );
+
+    return result[0].counter;
+  }
+
   private async generateSerial(): Promise<string> {
     const { week, year } = getISOWeekYear(new Date());
     const strWeek = String(week).padStart(2, '0');
     const strYear = String(year).slice(-2);
     const key = `item-${year}-${strWeek}`;
 
-    const result = await this.prisma.$queryRaw<[{ counter: number }]>`
-      INSERT INTO "Sequences" ("Key", "Counter")
-      VALUES (${key}, 1)
-      ON CONFLICT ("Key") DO UPDATE
-        SET "Counter" = "Sequences"."Counter" + 1
-      RETURNING "Counter" AS counter
-    `;
+    const counter = await this.allocateSequence(
+      key,
+      Prisma.sql`1`,
+      Prisma.sql`"Sequences"."Counter" + 1`,
+    );
 
-    const counter = result[0].counter;
     // The serial format is S + YY(2) + WW(2) + counter(4) = 9 chars, which is
     // the width of SerialNumber (VarChar(9)). A weekly counter past 9999 would
     // produce a 10-char serial that silently overflows the column at INSERT, so
@@ -121,6 +144,21 @@ export class OrdersService {
 
     const strCounter = String(counter).padStart(4, '0');
     return `S${strYear}${strWeek}${strCounter}`;
+  }
+
+  /**
+   * Atomically allocates the next order number from the shared "Sequences"
+   * table. The counter is seeded from the current MAX(OrderNumber) so generated
+   * numbers never collide with imported/legacy orders, and GREATEST keeps it
+   * ahead of any orders created with an explicit number (e.g. extra batches).
+   */
+  private async generateOrderNumber(): Promise<number> {
+    const floor = Prisma.sql`(SELECT COALESCE(MAX("OrderNumber"), 0) + 1 FROM "Order")`;
+    return this.allocateSequence(
+      'order',
+      floor,
+      Prisma.sql`GREATEST("Sequences"."Counter" + 1, ${floor})`,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -267,19 +305,24 @@ export class OrdersService {
     createdBy: string | null = null,
   ): Promise<Order> {
     const orderBatch = dto.orderBatch ?? 1;
-    const existing = await this.prisma.order.findUnique({
-      where: {
-        orderNumber_orderBatch: { orderNumber: dto.orderNumber, orderBatch },
-      },
-    });
+    const orderNumber = dto.orderNumber ?? (await this.generateOrderNumber());
+
+    // Independent of one another — run together rather than as two
+    // sequential round-trips.
+    const [existing, vatRateId] = await Promise.all([
+      this.prisma.order.findUnique({
+        where: {
+          orderNumber_orderBatch: { orderNumber, orderBatch },
+        },
+      }),
+      this.getCurrentVatRateId(),
+    ]);
 
     if (existing) {
       throw new BadRequestException(
-        `Order #${dto.orderNumber} (batch ${orderBatch}) already exists`,
+        `Order #${orderNumber} (batch ${orderBatch}) already exists`,
       );
     }
-
-    const vatRateId = await this.getCurrentVatRateId();
 
     const now = new Date();
     const [raw] = await this.prisma.$transaction([
@@ -287,6 +330,7 @@ export class OrdersService {
         data: {
           ...dto,
           ...normalizeOrderDates(dto),
+          orderNumber,
           orderBatch,
           vatRateId,
           status: OrderStatus.Received,
@@ -298,7 +342,7 @@ export class OrdersService {
       }),
       this.prisma.orderStatusHistory.create({
         data: {
-          orderNumber: dto.orderNumber,
+          orderNumber,
           orderBatch,
           status: OrderStatus.Received,
           changedOn: now,

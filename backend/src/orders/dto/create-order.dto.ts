@@ -10,9 +10,14 @@ import {
 } from 'class-validator';
 
 export class CreateOrderDto {
+  /**
+   * Optional. When omitted, the server auto-generates the next order number.
+   * An explicit value is only needed to add a new batch under an existing order.
+   */
+  @IsOptional()
   @IsInt()
   @Min(0)
-  orderNumber: number;
+  orderNumber?: number;
 
   @IsOptional()
   @IsInt()

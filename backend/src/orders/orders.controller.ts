@@ -241,22 +241,26 @@ export class OrdersController {
    */
   @Post()
   @Roles(Role.Operative, Role.Manager, Role.Admin)
-  @ApiOperation({ summary: 'Create a new order' })
+  @ApiOperation({
+    summary: 'Create a new order',
+    description:
+      'The orderNumber is assigned automatically when omitted. Supply it only ' +
+      'to add a new batch under an existing order.',
+  })
   @ApiBody({
     type: CreateOrderDto,
     examples: {
       minimal: {
-        summary: 'Minimal order',
+        summary: 'Minimal order (order number is auto-assigned)',
         value: {
-          orderNumber: 10001,
           customerAccount: 42,
         },
       },
       full: {
-        summary: 'Full order',
+        summary: 'Full order with an explicit number (e.g. an extra batch)',
         value: {
           orderNumber: 10001,
-          orderBatch: 1,
+          orderBatch: 2,
           customerAccount: 42,
           customerRef: 'PO-2024-001',
           orderContact: 'Jane Doe',
@@ -442,25 +446,22 @@ export class OrdersController {
     summary: 'Add an item to an order',
     description:
       'The orderNumber and orderBatch are taken from the URL path. ' +
-      'Any parentOrder / parentBatch values in the body are ignored in favour of the path params.',
+      'Any parentOrder / parentBatch values in the body are ignored in favour of the path params. ' +
+      'The serialNumber and week are assigned automatically by the server and are ignored if supplied.',
   })
   @ApiBody({
     type: CreateOrderedItemDto,
     examples: {
       minimal: {
-        summary: 'Minimal item',
-        value: {
-          serialNumber: 'SN000001',
-        },
+        summary: 'Minimal item (serial number is auto-assigned)',
+        value: {},
       },
       full: {
         summary: 'Full hearing aid item',
         value: {
-          serialNumber: 'SN000001',
           patientInitial: 'J',
           patientSurname: 'Smith',
           modelCode: 'HA-PRO-3',
-          week: 24,
           customerRef: 'PO-2024-001',
           side: 'R',
           description: 'Pro Hearing Aid Right',
