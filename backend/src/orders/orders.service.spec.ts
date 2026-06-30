@@ -402,6 +402,51 @@ describe('OrdersService', () => {
       );
     });
 
+    it('auto-generates the order number when one is not provided', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([{ counter: 5005 }]);
+      mockPrisma.order.findUnique.mockResolvedValue(null);
+      mockPrisma.vatRate.findFirst.mockResolvedValue({
+        vatRateId: 1,
+        rate: 20,
+        label: 'Standard UK',
+        validFrom: new Date(),
+        validTo: null,
+      });
+      mockPrisma.order.create.mockResolvedValue(
+        makeOrder({ orderNumber: 5005 }),
+      );
+
+      await service.create({ customerAccount: 1 } as any);
+
+      expect(mockPrisma.$queryRaw).toHaveBeenCalled();
+      expect(mockPrisma.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ orderNumber: 5005 }),
+        }),
+      );
+      expect(mockPrisma.orderStatusHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ orderNumber: 5005 }),
+        }),
+      );
+    });
+
+    it('does not auto-generate when an explicit order number is provided', async () => {
+      mockPrisma.order.findUnique.mockResolvedValue(null);
+      mockPrisma.vatRate.findFirst.mockResolvedValue({
+        vatRateId: 1,
+        rate: 20,
+        label: 'Standard UK',
+        validFrom: new Date(),
+        validTo: null,
+      });
+      mockPrisma.order.create.mockResolvedValue(makeOrder());
+
+      await service.create({ orderNumber: 1001, customerAccount: 1 } as any);
+
+      expect(mockPrisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
     it('writes a Received history entry', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
       mockPrisma.vatRate.findFirst.mockResolvedValue({
@@ -818,10 +863,8 @@ describe('OrdersService', () => {
 
       await service.createItem({ parentOrder: 1001 } as any);
 
-      const sqlParts = mockPrisma.$queryRaw.mock.calls[0][0] as string[];
-      expect(sqlParts.join('')).toMatch(
-        /RETURNING\s+"Counter"\s+AS\s+counter/i,
-      );
+      const sqlArg = mockPrisma.$queryRaw.mock.calls[0][0] as { text: string };
+      expect(sqlArg.text).toMatch(/RETURNING\s+"Counter"\s+AS\s+counter/i);
     });
   });
 

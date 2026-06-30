@@ -61,6 +61,18 @@ export async function cleanupE2E(prisma: PrismaService): Promise<void> {
   });
   await prisma.order.deleteMany({ where: { orderNumber: { gte: ORDER_NS } } });
 
+  // If an order was ever auto-generated (no explicit orderNumber) while
+  // ORDER_NS fixtures existed, OrdersService.generateOrderNumber() seeds its
+  // counter from MAX(OrderNumber) and could have ratcheted the shared
+  // "order" sequence into the reserved namespace — and GREATEST(...) never
+  // lets it drop back down on its own. Clamp it here so future auto-generated
+  // orders (locally, against the shared dev DB) don't fall into ORDER_NS and
+  // get swept up by the next cleanup run.
+  await prisma.sequence.updateMany({
+    where: { key: 'order', counter: { gte: ORDER_NS } },
+    data: { counter: ORDER_NS - 1 },
+  });
+
   // Tagged customers and their addresses.
   const tagged = await prisma.customer.findMany({
     where: { companyName: { startsWith: E2E_MARKER } },
