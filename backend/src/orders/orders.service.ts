@@ -17,6 +17,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { CreateOrderedItemDto } from './dto/create-ordered-item.dto';
 import { UpdateOrderedItemDto } from './dto/update-ordered-item.dto';
+import { PriceListService } from '../price-list/price-list.service';
 
 function getISOWeekYear(date: Date): { week: number; year: number } {
   const d = new Date(
@@ -92,7 +93,10 @@ function attachComputedOrderFields(raw: any): Order {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly priceListService: PriceListService,
+  ) {}
 
   /**
    * Atomically allocates the next counter value for `key` in the shared
@@ -547,10 +551,23 @@ export class OrdersService {
     createdBy: string | null = null,
   ): Promise<OrderedItem> {
     const parentBatch = dto.parentBatch ?? 1;
-    await this.findOne(dto.parentOrder, parentBatch);
+    const order = await this.findOne(dto.parentOrder, parentBatch);
 
     const serialNumber = await this.generateSerial();
     const { week } = getISOWeekYear(new Date());
+
+    // Auto-price from the active price list when the item has a catalogue
+    // model code and the order has a price band. This overrides any
+    // client-supplied price so pricing stays authoritative and consistent
+    // regardless of what the caller sends. Off-catalogue items (no model
+    // code, no match, or no band) keep the client-supplied price untouched.
+    const autoPrice =
+      dto.modelCode && order.priceBand
+        ? await this.priceListService.findActivePrice(
+            dto.modelCode,
+            order.priceBand,
+          )
+        : null;
 
     await this.prisma.orderedItem.create({
       data: {
@@ -560,6 +577,13 @@ export class OrdersService {
         parentBatch,
         createdOn: new Date(),
         createdBy,
+        ...(autoPrice
+          ? {
+              price: autoPrice.price,
+              priceListRevisionId: autoPrice.revisionId,
+              priceListName: order.priceBand,
+            }
+          : {}),
       },
     });
 
@@ -578,9 +602,35 @@ export class OrdersService {
       );
     }
 
+    // Re-price whenever the model code is being set/changed, same rule as
+    // createItem: a catalogue match overrides any client-supplied price,
+    // an off-catalogue/unmatched model code leaves the client's price alone.
+    const priceBand = item.order?.priceBand;
+    const autoPrice =
+      dto.modelCode && priceBand
+        ? await this.priceListService.findActivePrice(dto.modelCode, priceBand)
+        : null;
+
+    // If the update touches price or model code but there's no catalogue match,
+    // the price is now a manual value — clear the price-list provenance so the
+    // item doesn't keep claiming a list/revision it no longer came from.
+    const pricingTouched =
+      dto.price !== undefined || dto.modelCode !== undefined;
+
     await this.prisma.orderedItem.update({
       where: { serialNumber },
-      data: dto,
+      data: {
+        ...dto,
+        ...(autoPrice
+          ? {
+              price: autoPrice.price,
+              priceListRevisionId: autoPrice.revisionId,
+              priceListName: priceBand,
+            }
+          : pricingTouched
+            ? { priceListRevisionId: null, priceListName: null }
+            : {}),
+      },
     });
 
     return this.findItem(serialNumber);

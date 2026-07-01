@@ -144,7 +144,7 @@ model VatRate {
 model Order {
   orderNumber           Int              @map("OrderNumber")
   orderBatch            Int              @default(1) @map("OrderBatch")
-  customerAccount       Int?             @map("CustomerAccount")
+  customerAccount       Int              @map("CustomerAccount")
   customerRef           String?          @db.VarChar(50) @map("CustomerRef")
   orderContact          String?          @db.VarChar(100) @map("OrderContact")
   deliveryAddress       Int?             @map("DeliveryAddress")
@@ -160,7 +160,7 @@ model Order {
   createdBy             String?          @db.VarChar(100) @map("CreatedBy")
   status                String           @default("Received") @db.VarChar(20) @map("Status")
   statusChangedOn       DateTime?        @map("StatusChangedOn")
-  customer              Customer?        @relation(fields: [customerAccount], references: [customerId])
+  customer              Customer         @relation(fields: [customerAccount], references: [customerId], onDelete: Restrict)
   deliveryAddressDetail CustomerAddress? @relation(fields: [deliveryAddress], references: [addressId])
   vatRate               VatRate?         @relation(fields: [vatRateId], references: [vatRateId])
   items                 OrderedItem[]
