@@ -27,14 +27,18 @@ export class PriceListService {
   // Internal helpers
   // ---------------------------------------------------------------------------
 
-  private async getActiveRevision(): Promise<PriceListRevision> {
-    const revision = await this.prisma.priceListRevision.findFirst({
+  private async findActiveRevisionOrNull(): Promise<PriceListRevision | null> {
+    return this.prisma.priceListRevision.findFirst({
       where: { status: 'active' },
-    });
+    }) as Promise<PriceListRevision | null>;
+  }
+
+  private async getActiveRevision(): Promise<PriceListRevision> {
+    const revision = await this.findActiveRevisionOrNull();
     if (!revision) {
       throw new NotFoundException('No active price list revision found');
     }
-    return revision as PriceListRevision;
+    return revision;
   }
 
   private async getActiveListTypes(): Promise<PriceListType[]> {
@@ -271,6 +275,40 @@ export class PriceListService {
       price: entry?.price ?? null,
       revisionId: revision.id,
     };
+  }
+
+  /**
+   * Lenient price lookup for automatic order-item pricing. Unlike
+   * getPriceForList, this never throws — an unknown item, unknown list, or
+   * missing active revision just means "no price to auto-apply", which is a
+   * normal outcome for off-catalogue items and shouldn't block item creation.
+   * Returns null if no price is found (including a price entry present but
+   * stored as null).
+   */
+  async findActivePrice(
+    itemId: string,
+    listName: string,
+  ): Promise<{ price: number; revisionId: number } | null> {
+    const revision = await this.findActiveRevisionOrNull();
+    if (!revision) return null;
+
+    const listType = await this.prisma.priceListType.findUnique({
+      where: { name: listName },
+    });
+    if (!listType || listType.void) return null;
+
+    const entry = await this.prisma.itemPrice.findUnique({
+      where: {
+        itemId_listId_revisionId: {
+          itemId,
+          listId: listType.id,
+          revisionId: revision.id,
+        },
+      },
+    });
+    if (entry?.price == null) return null;
+
+    return { price: entry.price, revisionId: revision.id };
   }
 
   async getAllListsForItem(

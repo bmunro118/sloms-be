@@ -2,7 +2,6 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  IsNumber,
   IsBoolean,
   IsDateString,
   MaxLength,
@@ -24,9 +23,8 @@ export class CreateOrderDto {
   @Min(1)
   orderBatch?: number;
 
-  @IsOptional()
   @IsInt()
-  customerAccount?: number;
+  customerAccount: number;
 
   @IsOptional()
   @IsString()
@@ -49,21 +47,6 @@ export class CreateOrderDto {
   @IsOptional()
   @IsDateString()
   dispatchedOn?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  orderTotal?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  itemCount?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  avgPrice?: number;
 
   @IsOptional()
   @IsString()

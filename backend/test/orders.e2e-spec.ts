@@ -1,8 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { Role } from '../src/users/entities/role.enum';
 import { createTestApp } from './support/app';
 import { api, authHeader } from './support/http';
-import { login } from './support/auth';
+import { login, loginAllRoles } from './support/auth';
 import { cleanupE2E, testOrderNumber } from './support/factories';
 
 /**
@@ -21,6 +22,7 @@ describe('Orders (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let token: string;
+  let tokens: Record<Role, string>;
 
   const TEST_ORDER = testOrderNumber(111);
   const TEST_BATCH = 1;
@@ -29,6 +31,7 @@ describe('Orders (e2e)', () => {
     ({ app, prisma } = await createTestApp());
     await cleanupE2E(prisma);
     token = await login(app, 'admin', 'admin123');
+    tokens = await loginAllRoles(app);
   });
 
   afterAll(async () => {
@@ -37,6 +40,7 @@ describe('Orders (e2e)', () => {
   });
 
   const auth = () => authHeader(token);
+  const as = (role: Role) => authHeader(tokens[role]);
 
   describe('auth + guards', () => {
     it('rejects a bad password with 401', () =>
@@ -258,5 +262,187 @@ describe('Orders (e2e)', () => {
         .delete(`/api/orders/${ORDER}/${BATCH}/items/${serial}`)
         .set(auth())
         .expect(200));
+  });
+
+  // ─── authz (role matrix) ──────────────────────────────────────────────────────
+  describe('authz (role matrix)', () => {
+    // Never created — the RolesGuard runs before the route handler looks
+    // anything up, so a disallowed role gets 403 regardless of whether the
+    // target order/item exists.
+    const FAKE_ORDER = testOrderNumber(999999);
+    const FAKE_BATCH = 1;
+
+    it('ReadOnly cannot create an order (403 — needs Operative+)', () =>
+      api(app)
+        .post('/api/orders')
+        .set(as(Role.ReadOnly))
+        .send({ customerAccount: 2 })
+        .expect(403));
+
+    it('Customer role cannot create an order (403)', () =>
+      api(app)
+        .post('/api/orders')
+        .set(as(Role.Customer))
+        .send({ customerAccount: 2 })
+        .expect(403));
+
+    it('ReadOnly cannot update an order (403 — needs Operative+)', () =>
+      api(app)
+        .put(`/api/orders/${FAKE_ORDER}/${FAKE_BATCH}`)
+        .set(as(Role.ReadOnly))
+        .send({ customerRef: 'x' })
+        .expect(403));
+
+    it('Operative cannot void an order (403 — needs Manager+)', () =>
+      api(app)
+        .delete(`/api/orders/${FAKE_ORDER}/${FAKE_BATCH}`)
+        .set(as(Role.Operative))
+        .expect(403));
+
+    it('ReadOnly cannot dispatch an order (403 — needs Operative+)', () =>
+      api(app)
+        .patch(`/api/orders/${FAKE_ORDER}/${FAKE_BATCH}/dispatch`)
+        .set(as(Role.ReadOnly))
+        .expect(403));
+
+    it('ReadOnly cannot add an item (403 — needs Operative+)', () =>
+      api(app)
+        .post(`/api/orders/${FAKE_ORDER}/${FAKE_BATCH}/items`)
+        .set(as(Role.ReadOnly))
+        .send({})
+        .expect(403));
+
+    it('Operative cannot void an item (403 — needs Manager+)', () =>
+      api(app)
+        .delete(`/api/orders/${FAKE_ORDER}/${FAKE_BATCH}/items/UNKNOWN`)
+        .set(as(Role.Operative))
+        .expect(403));
+  });
+
+  // ─── validation: customerAccount required; orderTotal/itemCount/avgPrice gone ─
+  describe('validation (customerAccount required; computed fields rejected)', () => {
+    it('rejects order creation without customerAccount (400)', () =>
+      api(app)
+        .post('/api/orders')
+        .set(auth())
+        .send({ orderNumber: testOrderNumber(113) })
+        .expect(400));
+
+    it.each(['orderTotal', 'itemCount', 'avgPrice'])(
+      'rejects %s as an unknown property (400 — these are computed at read time, not settable)',
+      (field) =>
+        api(app)
+          .post('/api/orders')
+          .set(auth())
+          .send({
+            orderNumber: testOrderNumber(114),
+            customerAccount: 2,
+            [field]: 100,
+          })
+          .expect(400),
+    );
+  });
+
+  // ─── customer role scoping (toCustomerView) ──────────────────────────────────
+  describe('customer role scoping (toCustomerView)', () => {
+    const ORDER = testOrderNumber(115);
+    const BATCH = 1;
+
+    beforeAll(() =>
+      api(app)
+        .post('/api/orders')
+        .set(auth())
+        .send({
+          orderNumber: ORDER,
+          customerAccount: 1, // seeded "Northwood Hearing" — linked to the customer1 test login
+          orderContact: 'Scoping Test',
+        })
+        .expect(201));
+
+    it('Customer role sees the reduced view, not the full order shape', async () => {
+      const res = await api(app)
+        .get(`/api/orders/${ORDER}/${BATCH}`)
+        .set(as(Role.Customer))
+        .expect(200);
+      expect(res.body.orderNumber).toBe(ORDER);
+      expect(res.body).toHaveProperty('itemCount');
+      expect(res.body).not.toHaveProperty('orderTotal');
+      expect(res.body).not.toHaveProperty('avgPrice');
+      expect(res.body).not.toHaveProperty('customerAccount');
+    });
+
+    it("Customer role cannot view another customer's order (403)", () =>
+      // TEST_ORDER (111) belongs to customerAccount 2, not the linked customer (1)
+      api(app)
+        .get(`/api/orders/${TEST_ORDER}/${TEST_BATCH}`)
+        .set(as(Role.Customer))
+        .expect(403));
+  });
+
+  // ─── automatic price-list pricing (createItem / updateItem) ─────────────────
+  describe('automatic price-list pricing', () => {
+    const ORDER = testOrderNumber(116);
+    const BATCH = 1;
+    // Seeded catalogue item priced in every band, including Dispensary — see
+    // prisma/seed.sql's _seed_cat rows.
+    const MODEL_CODE = 'S0058';
+    const BAND = 'Dispensary';
+    let expectedPrice: number;
+
+    beforeAll(async () => {
+      const priceRes = await api(app)
+        .get(`/api/price-list/${MODEL_CODE}/lists/${BAND}`)
+        .set(auth())
+        .expect(200);
+      expectedPrice = Number(priceRes.body.price);
+      expect(expectedPrice).toBeGreaterThan(0);
+
+      await api(app)
+        .post('/api/orders')
+        .set(auth())
+        .send({ orderNumber: ORDER, customerAccount: 2, priceBand: BAND })
+        .expect(201);
+    });
+
+    it('auto-prices a new item from the active price list, overriding a client-supplied price', async () => {
+      const res = await api(app)
+        .post(`/api/orders/${ORDER}/${BATCH}/items`)
+        .set(auth())
+        .send({ modelCode: MODEL_CODE, price: 999999 })
+        .expect(201);
+
+      expect(Number(res.body.price)).toBe(expectedPrice);
+      expect(res.body.priceListName).toBe(BAND);
+      expect(res.body.priceListRevisionId).toBeGreaterThan(0);
+    });
+
+    it('leaves the client-supplied price alone for an off-catalogue modelCode', async () => {
+      const res = await api(app)
+        .post(`/api/orders/${ORDER}/${BATCH}/items`)
+        .set(auth())
+        .send({ modelCode: '__E2E_NOT_IN_CATALOGUE__', price: 55.5 })
+        .expect(201);
+
+      expect(Number(res.body.price)).toBe(55.5);
+      expect(res.body.priceListRevisionId).toBeFalsy();
+    });
+
+    it('re-prices on update when modelCode is set to a catalogue match', async () => {
+      const created = await api(app)
+        .post(`/api/orders/${ORDER}/${BATCH}/items`)
+        .set(auth())
+        .send({ price: 1 })
+        .expect(201);
+      expect(Number(created.body.price)).toBe(1); // no modelCode yet → untouched
+
+      const res = await api(app)
+        .put(`/api/orders/${ORDER}/${BATCH}/items/${created.body.serialNumber}`)
+        .set(auth())
+        .send({ modelCode: MODEL_CODE, price: 12345 })
+        .expect(200);
+
+      expect(Number(res.body.price)).toBe(expectedPrice);
+      expect(res.body.priceListName).toBe(BAND);
+    });
   });
 });

@@ -6,8 +6,13 @@ import {
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PriceListService } from '../price-list/price-list.service';
 import { OrderStatus } from './enums/order-status.enum';
 import { ItemStatus } from './enums/item-status.enum';
+
+const mockPriceListService = {
+  findActivePrice: jest.fn(),
+};
 
 const mockPrisma = {
   order: {
@@ -102,6 +107,7 @@ describe('OrdersService', () => {
       providers: [
         OrdersService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: PriceListService, useValue: mockPriceListService },
       ],
     }).compile();
 
@@ -934,6 +940,88 @@ describe('OrdersService', () => {
       const result = await service.createItem({ parentOrder: 1001 } as any);
       expect(result.serialNumber).toMatch(/^S/);
     });
+
+    it('auto-prices from the active price list when modelCode and order.priceBand match', async () => {
+      const item = makeItem({ modelCode: 'ABC123', price: 42 });
+      mockPrisma.orderedItem.create.mockResolvedValue({});
+      mockPrisma.orderedItem.findUnique.mockResolvedValue({
+        ...item,
+        order: makeOrder({ priceBand: 'B1' }),
+      });
+      mockPrisma.$queryRaw.mockResolvedValue([{ counter: 1 }]);
+      mockPrisma.order.findUnique
+        .mockResolvedValueOnce(makeOrder({ priceBand: 'B1' })) // parent check
+        .mockResolvedValueOnce(
+          makeOrder({ priceBand: 'B1', items: [item], status: OrderStatus.InProduction }),
+        )
+        .mockResolvedValueOnce(makeOrder({ priceBand: 'B1', status: OrderStatus.InProduction }));
+      mockPrisma.order.update.mockResolvedValue({});
+      mockPriceListService.findActivePrice.mockResolvedValue({
+        price: 42,
+        revisionId: 7,
+      });
+
+      await service.createItem({
+        parentOrder: 1001,
+        modelCode: 'ABC123',
+        price: 999, // client-supplied price should be overridden
+      } as any);
+
+      expect(mockPriceListService.findActivePrice).toHaveBeenCalledWith('ABC123', 'B1');
+      const data = mockPrisma.orderedItem.create.mock.calls[0][0].data;
+      expect(data.price).toBe(42);
+      expect(data.priceListRevisionId).toBe(7);
+      expect(data.priceListName).toBe('B1');
+    });
+
+    it('falls back to the client-supplied price when there is no catalogue match', async () => {
+      const item = makeItem({ modelCode: 'OFFCAT', price: 999 });
+      mockPrisma.orderedItem.create.mockResolvedValue({});
+      mockPrisma.orderedItem.findUnique.mockResolvedValue({
+        ...item,
+        order: makeOrder({ priceBand: 'B1' }),
+      });
+      mockPrisma.$queryRaw.mockResolvedValue([{ counter: 1 }]);
+      mockPrisma.order.findUnique
+        .mockResolvedValueOnce(makeOrder({ priceBand: 'B1' }))
+        .mockResolvedValueOnce(
+          makeOrder({ priceBand: 'B1', items: [item], status: OrderStatus.InProduction }),
+        )
+        .mockResolvedValueOnce(makeOrder({ priceBand: 'B1', status: OrderStatus.InProduction }));
+      mockPrisma.order.update.mockResolvedValue({});
+      mockPriceListService.findActivePrice.mockResolvedValue(null);
+
+      await service.createItem({
+        parentOrder: 1001,
+        modelCode: 'OFFCAT',
+        price: 999,
+      } as any);
+
+      const data = mockPrisma.orderedItem.create.mock.calls[0][0].data;
+      expect(data.price).toBe(999);
+      expect(data.priceListRevisionId).toBeUndefined();
+    });
+
+    it('skips the price lookup entirely when the order has no priceBand', async () => {
+      const item = makeItem({ modelCode: 'ABC123' });
+      mockPrisma.orderedItem.create.mockResolvedValue({});
+      mockPrisma.orderedItem.findUnique.mockResolvedValue({
+        ...item,
+        order: makeOrder(),
+      });
+      mockPrisma.$queryRaw.mockResolvedValue([{ counter: 1 }]);
+      mockPrisma.order.findUnique
+        .mockResolvedValueOnce(makeOrder({ priceBand: null }))
+        .mockResolvedValueOnce(
+          makeOrder({ items: [item], status: OrderStatus.InProduction }),
+        )
+        .mockResolvedValueOnce(makeOrder({ status: OrderStatus.InProduction }));
+      mockPrisma.order.update.mockResolvedValue({});
+
+      await service.createItem({ parentOrder: 1001, modelCode: 'ABC123' } as any);
+
+      expect(mockPriceListService.findActivePrice).not.toHaveBeenCalled();
+    });
   });
 
   // ─── updateItem ───────────────────────────────────────────────────────────────
@@ -963,6 +1051,97 @@ describe('OrdersService', () => {
         description: 'Updated',
       } as any);
       expect(result.description).toBe('Updated');
+    });
+
+    it('re-prices from the active price list when modelCode is set on the update', async () => {
+      const item = makeItem({ modelCode: null, price: 999 });
+      mockPrisma.orderedItem.findUnique
+        .mockResolvedValueOnce({ ...item, order: makeOrder({ priceBand: 'B1' }) })
+        .mockResolvedValueOnce({
+          ...item,
+          modelCode: 'ABC123',
+          price: 42,
+          order: makeOrder({ priceBand: 'B1' }),
+        });
+      mockPrisma.orderedItem.update.mockResolvedValue({});
+      mockPriceListService.findActivePrice.mockResolvedValue({
+        price: 42,
+        revisionId: 7,
+      });
+
+      await service.updateItem('S260010001', {
+        modelCode: 'ABC123',
+        price: 999, // client-supplied price should be overridden
+      } as any);
+
+      expect(mockPriceListService.findActivePrice).toHaveBeenCalledWith('ABC123', 'B1');
+      const data = mockPrisma.orderedItem.update.mock.calls[0][0].data;
+      expect(data.price).toBe(42);
+      expect(data.priceListRevisionId).toBe(7);
+      expect(data.priceListName).toBe('B1');
+    });
+
+    it('keeps the client-supplied price when the new modelCode has no catalogue match', async () => {
+      const item = makeItem({ modelCode: null, price: 999 });
+      mockPrisma.orderedItem.findUnique
+        .mockResolvedValueOnce({ ...item, order: makeOrder({ priceBand: 'B1' }) })
+        .mockResolvedValueOnce({
+          ...item,
+          modelCode: 'OFFCAT',
+          order: makeOrder({ priceBand: 'B1' }),
+        });
+      mockPrisma.orderedItem.update.mockResolvedValue({});
+      mockPriceListService.findActivePrice.mockResolvedValue(null);
+
+      await service.updateItem('S260010001', {
+        modelCode: 'OFFCAT',
+        price: 999,
+      } as any);
+
+      const data = mockPrisma.orderedItem.update.mock.calls[0][0].data;
+      expect(data.price).toBe(999);
+      // Manual price with no catalogue match → provenance is cleared, not left stale.
+      expect(data.priceListRevisionId).toBeNull();
+      expect(data.priceListName).toBeNull();
+    });
+
+    it('clears stale price-list provenance when an auto-priced item gets a manual price', async () => {
+      // Item was previously auto-priced from list B1 revision 7; a plain price
+      // edit (no modelCode) must not keep claiming that list/revision.
+      const item = makeItem({
+        modelCode: 'ABC123',
+        price: 42,
+        priceListName: 'B1',
+        priceListRevisionId: 7,
+      });
+      mockPrisma.orderedItem.findUnique
+        .mockResolvedValueOnce({ ...item, order: makeOrder({ priceBand: 'B1' }) })
+        .mockResolvedValueOnce({
+          ...item,
+          price: 100,
+          order: makeOrder({ priceBand: 'B1' }),
+        });
+      mockPrisma.orderedItem.update.mockResolvedValue({});
+
+      await service.updateItem('S260010001', { price: 100 } as any);
+
+      expect(mockPriceListService.findActivePrice).not.toHaveBeenCalled();
+      const data = mockPrisma.orderedItem.update.mock.calls[0][0].data;
+      expect(data.price).toBe(100);
+      expect(data.priceListRevisionId).toBeNull();
+      expect(data.priceListName).toBeNull();
+    });
+
+    it('does not look up pricing when the update does not touch modelCode', async () => {
+      const item = makeItem({ modelCode: 'ABC123' });
+      mockPrisma.orderedItem.findUnique
+        .mockResolvedValueOnce({ ...item, order: makeOrder({ priceBand: 'B1' }) })
+        .mockResolvedValueOnce({ ...item, description: 'Updated', order: makeOrder({ priceBand: 'B1' }) });
+      mockPrisma.orderedItem.update.mockResolvedValue({});
+
+      await service.updateItem('S260010001', { description: 'Updated' } as any);
+
+      expect(mockPriceListService.findActivePrice).not.toHaveBeenCalled();
     });
   });
 
