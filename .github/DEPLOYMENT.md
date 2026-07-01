@@ -45,6 +45,25 @@ The infra workflow provisions more than the image-only deploys, so it needs:
 
 Each Container App pulls the image and reads its secrets (`database-url`, `jwt-secret`) from its own Key Vault via its system-assigned managed identity — no stored registry password or app secrets.
 
+## Backups
+
+`sloms-postgres-prod`/`-stage` keep automatic PITR backups (`az postgres
+flexible-server backup list -g sloms-<env> -n sloms-postgres-<env>`), but those
+only restore into a *new* server — they're not a portable local file.
+
+Before any operation that could drop or reset data (e.g. a migration squash
+like the one that reset stage on 2026-07-01, or promoting `integration → main`
+while prod is still pre-go-live), take a local dump first:
+
+```bash
+./infra/scripts/backup-prod-db.sh        # prod (default)
+./infra/scripts/backup-prod-db.sh stage  # stage
+```
+
+Requires `az login` (with read access to the target Key Vault) and `pg_dump`
+on PATH. Writes a timestamped `.dump` file under `backups/` (gitignored).
+Restore with `pg_restore -d <target-database-url> --clean --if-exists <file>`.
+
 ## Recommended
 
 - Protect `main` (require PRs / passing CI) so prod only updates via an `integration → main` merge.
