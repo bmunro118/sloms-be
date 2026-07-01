@@ -24,16 +24,19 @@ OUT_FILE="${OUT_DIR}/slomsdb-${ENV}-$(date +%Y%m%dT%H%M%S).dump"
 mkdir -p "$OUT_DIR"
 
 echo "[INFO] Resolving connection details for ${SERVER_NAME} (rg ${RESOURCE_GROUP})..."
+# `az ... -o tsv` emits CRLF on some hosts (observed under WSL); $() only
+# strips the trailing \n, so strip any stray \r explicitly — an embedded \r
+# in DATABASE_URL would otherwise make pg_dump fail to parse the DSN.
 FQDN=$(az postgres flexible-server show \
   --resource-group "$RESOURCE_GROUP" \
   --name "$SERVER_NAME" \
-  --query fullyQualifiedDomainName -o tsv)
+  --query fullyQualifiedDomainName -o tsv | tr -d '\r')
 
 # database-url in Key Vault is the full DSN the app uses; pg_dump accepts it directly.
 DATABASE_URL=$(az keyvault secret show \
   --vault-name "$KEY_VAULT" \
   --name database-url \
-  --query value -o tsv)
+  --query value -o tsv | tr -d '\r')
 
 echo "[INFO] Dumping ${SERVER_NAME} (${FQDN}) to ${OUT_FILE}..."
 export DATABASE_URL
@@ -51,4 +54,17 @@ fi
 unset DATABASE_URL
 
 echo "[OK] Backup written to ${OUT_FILE}"
-echo "[INFO] Restore with: pg_restore -d <target-database-url> --clean --if-exists ${OUT_FILE}"
+echo "[INFO] Restore into a real server:"
+echo "  pg_restore -d <target-database-url> --clean --if-exists --no-owner --no-privileges ${OUT_FILE}"
+echo "  (--no-owner --no-privileges skips ACL/GRANT statements tied to Azure-managed"
+echo "  roles like azure_pg_admin, which don't exist outside Azure and would otherwise"
+echo "  print harmless 'role does not exist' errors — the actual data restores fine"
+echo "  either way, but this keeps the run clean.)"
+echo ""
+echo "[INFO] Restore into your local dev Postgres (sloms-postgres container) to verify the backup:"
+echo "  docker cp \"${OUT_FILE}\" sloms-postgres:/tmp/restore.dump"
+echo "  docker exec -e PGPASSWORD=postgres sloms-postgres psql -U postgres -d postgres -c \"CREATE DATABASE slomsdb_restore_test\""
+echo "  docker exec -e PGPASSWORD=postgres sloms-postgres pg_restore -U postgres -d slomsdb_restore_test --clean --if-exists --no-owner --no-privileges /tmp/restore.dump"
+echo "  # ...verify in pgAdmin or: docker exec -e PGPASSWORD=postgres sloms-postgres psql -U postgres -d slomsdb_restore_test -c '\\dt'"
+echo "  docker exec -e PGPASSWORD=postgres sloms-postgres psql -U postgres -d postgres -c \"DROP DATABASE slomsdb_restore_test\""
+echo "  docker exec sloms-postgres rm /tmp/restore.dump"

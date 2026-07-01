@@ -60,9 +60,40 @@ while prod is still pre-go-live), take a local dump first:
 ./infra/scripts/backup-prod-db.sh stage  # stage
 ```
 
-Requires `az login` (with read access to the target Key Vault) and `pg_dump`
-on PATH. Writes a timestamped `.dump` file under `backups/` (gitignored).
-Restore with `pg_restore -d <target-database-url> --clean --if-exists <file>`.
+Requires `az login` (with read access to the target Key Vault). Uses a local
+`pg_dump` if one is on PATH, otherwise falls back to running it inside a
+throwaway `postgres:16-alpine` container via Docker. Writes a timestamped
+`.dump` file under `backups/` (gitignored).
+
+### Restoring
+
+Into a real server:
+
+```bash
+pg_restore -d <target-database-url> --clean --if-exists --no-owner --no-privileges <file>
+```
+
+`--no-owner --no-privileges` skips ACL/GRANT statements tied to Azure-managed
+roles (e.g. `azure_pg_admin`) that don't exist outside Azure — without these
+flags you'll see harmless `role "azure_pg_admin" does not exist` errors;
+the actual data restores fine either way, but the flags keep the run clean.
+
+Into your local dev Postgres (the `sloms-postgres` container from the root
+`docker-compose.yml`), to verify a backup actually restores before you need it
+for real:
+
+```bash
+docker cp <file> sloms-postgres:/tmp/restore.dump
+docker exec -e PGPASSWORD=postgres sloms-postgres psql -U postgres -d postgres -c "CREATE DATABASE slomsdb_restore_test"
+docker exec -e PGPASSWORD=postgres sloms-postgres pg_restore -U postgres -d slomsdb_restore_test --clean --if-exists --no-owner --no-privileges /tmp/restore.dump
+# ...verify in pgAdmin (localhost:5433 / slomsdb_restore_test), or:
+docker exec -e PGPASSWORD=postgres sloms-postgres psql -U postgres -d slomsdb_restore_test -c "\dt"
+docker exec -e PGPASSWORD=postgres sloms-postgres psql -U postgres -d postgres -c "DROP DATABASE slomsdb_restore_test"
+docker exec sloms-postgres rm /tmp/restore.dump
+```
+
+Connect from outside the container (e.g. pgAdmin) via `localhost:5433`, not
+the container-internal `5432` used above by `docker exec`.
 
 ## Recommended
 
