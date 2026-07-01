@@ -357,7 +357,8 @@ describe('Orders (e2e)', () => {
           customerAccount: 1, // seeded "Northwood Hearing" — linked to the customer1 test login
           orderContact: 'Scoping Test',
         })
-        .expect(201));
+        .expect(201),
+    );
 
     it('Customer role sees the reduced view, not the full order shape', async () => {
       const res = await api(app)
