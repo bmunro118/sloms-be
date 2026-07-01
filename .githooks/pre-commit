@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs eslint --fix + prettier --write on staged files before allowing a commit.
+# See lint-staged config in backend/package.json.
+cd backend && npx lint-staged
